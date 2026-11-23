@@ -1,0 +1,121 @@
+\chapter{Installation and layout}
+\label{ch:install}
+
+\section{Requirements}
+
+The trainer uses 64-bit floating point for every trainable tensor and every PDE derivative.
+\file{swe_pinn/physics/quantum.py} enables JAX double precision when the package is imported, so JAX is imported even for a classical run.
+
+Install the third-party packages from the repository root:
+
+\begin{lstlisting}[style=sh]
+pip install tensorflow optuna scipy matplotlib numpy pennylane jax jaxlib pandas
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{@{}lp{9.2cm}@{}}
+\toprule
+Package & Role \\
+\midrule
+TensorFlow / Keras &
+Dense layers, Adam, \code{GradientTape} derivatives, saved weights \\
+NumPy &
+Collocation coordinates, exact-solution arrays, archives \\
+Optuna &
+Study, TPE sampler, SQLite storage, completed-trial cap \\
+SciPy &
+Optional L-BFGS-B; root finding for the dam-break and bump references \\
+PennyLane &
+Circuit definition and the \code{default.qubit} statevector device \\
+JAX &
+Batched just-in-time circuit and its vector--Jacobian products \\
+Matplotlib &
+Figures written by \file{analysis/analyze_study.py} \\
+pandas &
+Trial tables in the analysis script. The trainer does not import it \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+PennyLane is imported only when a circuit is constructed.
+A classical-only run still imports JAX, because the quantum module is imported with the package, and it does not construct a circuit.
+A hybrid or full-quantum run needs both PennyLane and JAX.
+The circuit is compiled with the JAX interface and differentiated with \code{diff_method="backprop"}.
+
+Python~3.10 or newer matches the type hints in \file{user_input.py}.
+The commands below use \code{python}; on some systems the interpreter is \code{python3}.
+\file{run_cores.sh} calls \code{python3}.
+
+\section{Check that the package imports}
+
+From the repository root:
+
+\begin{lstlisting}[style=sh]
+python -c "from swe_pinn.physics.common import MODEL_FAMILIES; print(MODEL_FAMILIES)"
+\end{lstlisting}
+
+The expected line is
+
+\begin{lstlisting}[style=sh]
+('classical', 'hybrid_quantum', 'full_quantum')
+\end{lstlisting}
+
+A missing PennyLane installation does not fail this import.
+It fails later, on the first hybrid or full-quantum model, with a message that names \code{pip install pennylane}.
+
+\section{Repository layout}
+
+Run every command from the repository root, the directory that contains \file{run_pinn.py} and \file{user_input.py}.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Path & Role \\
+\midrule
+\file{user_input.py} &
+The active input file. The solver reads \code{USER_PINN_INPUTS} and the physical dataclass selected by \code{problem_name}. \\
+\file{user_input.py.*} &
+Ready-made copies of that file for particular benchmarks and family sets. Copy one over \file{user_input.py} to use it. \\
+\file{run_pinn.py} &
+Process entry point. \\
+\file{run_cores.sh} &
+\(N\) search workers, then one final training. \\
+\file{swe_pinn/cli.py} &
+Argument parser for \code{--search-only}, \code{--worker-id}, and \code{--finalize}. \\
+\file{swe_pinn/core/solver.py} &
+Loss, Adam, L-BFGS-B, Optuna, and archives. \\
+\file{swe_pinn/physics/common.py} &
+The \code{PINN} network, collocation grids, and the problem dataclass. \\
+\file{swe_pinn/physics/quantum.py} &
+PennyLane circuit and the TensorFlow bridge. \\
+\file{swe_pinn/problems/} &
+Benchmark builders and the registry in \file{__init__.py}. \\
+\file{swe_pinn/plots/jcp.py} &
+Plot helpers. The solver itself writes NumPy archives; the study figures are made by the analysis script. \\
+\file{analysis/analyze_study.py} &
+Tradeoff report, Optuna figures, and the analytic comparison. \\
+\file{analysis/<database>/} &
+One folder per SQLite file: the database, \file{data/}, and \file{figures/}. \\
+\file{logs/} &
+Worker logs and the shared trial-table counter used by a parallel search. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+A relative SQLite URL such as \code{sqlite:///optuna_tide.db} is stored at \file{analysis/optuna_tide/optuna_tide.db}.
+The folder name is the database file name without \file{.db}.
+Weights, \file{best_hyperparameters.txt}, and the NumPy archives go in \file{analysis/optuna_tide/data/}, whether or not Optuna actually ran.
+Point \code{storage_url} at a new file before a smoke test so a short run does not replace the weights of a finished study.
+Absolute SQLite URLs are left unchanged.
+
+\section{First command}
+
+After the packages import, the shortest confirmation that the entry point is wired up is the help text:
+
+\begin{lstlisting}[style=sh]
+python run_pinn.py --help
+\end{lstlisting}
+
+That command does not train a model.
+The first training run is Example~\ref{ex:classical} in Chapter~\ref{ch:examples}.
+Give it a new \code{storage_url} and a modest \code{final_adam_epochs} before you launch a multi-hour study.

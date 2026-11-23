@@ -1,0 +1,102 @@
+\documentclass[11pt,letterpaper]{report}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\hypersetup{
+  pdftitle={HPINNS User Manual},
+  pdfauthor={HPINNS},
+  pdfsubject={How to train classical, hybrid-quantum, and full-quantum shallow-water PINNs}
+}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.25em,topsep=0.4em}
+\setlist[enumerate]{leftmargin=1.5em,itemsep=0.25em,topsep=0.4em}
+\setlist[description]{style=nextline,leftmargin=1.2em,itemsep=0.45em,topsep=0.4em}
+
+\lstdefinestyle{py}{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=false,
+  frame=single,
+  framesep=5pt,
+  xleftmargin=0.4em,
+  framexleftmargin=0.4em,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=4,
+  aboveskip=0.85em,
+  belowskip=0.7em,
+  keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{black!55},
+  stringstyle=\color{teal!50!black}
+}
+\lstdefinestyle{sh}{
+  language=bash,
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  framesep=5pt,
+  xleftmargin=0.4em,
+  framexleftmargin=0.4em,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  aboveskip=0.85em,
+  belowskip=0.7em,
+  keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{black!55}
+}
+\lstset{style=py}
+
+\DeclareUrlCommand{\file}{\urlstyle{tt}}
+\DeclareUrlCommand{\code}{\urlstyle{tt}}
+\setlength{\emergencystretch}{2em}
+
+\title{%
+  HPINNS User Manual\\[0.4em]
+  \large Classical, hybrid-quantum, and full-quantum\\
+  shallow-water physics-informed neural networks}
+\author{HPINNS}
+\date{November 23, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+HPINNS trains a physics-informed neural network for the shallow-water equations.
+One trainer serves three model families.
+The classical family gives each field its own multilayer perceptron.
+The hybrid-quantum family keeps that perceptron and adds a residual quantum circuit on every tower.
+The full-quantum family has no hidden perceptron: each field is a linear readout of a variational circuit applied to the scaled coordinates.
+This manual explains how to install the package, choose a family, set a benchmark, run a fixed model, search several families with Optuna, and read the files a run writes.
+Worked input settings are given for each family and for a joint three-family search.
+\end{abstract}
+
+\tableofcontents
+
+\input{chapters/01_introduction}
+\input{chapters/02_install}
+\input{chapters/03_families}
+\input{chapters/04_training}
+\input{chapters/05_benchmarks}
+\input{chapters/06_configuration}
+\input{chapters/07_examples}
+\input{chapters/08_search}
+\input{chapters/09_outputs}
+\input{chapters/10_troubleshooting}
+
+\end{document}

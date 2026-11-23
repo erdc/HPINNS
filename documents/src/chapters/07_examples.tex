@@ -1,0 +1,286 @@
+\chapter{Examples for each family}
+\label{ch:examples}
+
+Each example is a fixed architecture: Optuna is off, and one family is trained.
+Edit the assignments inside \code{UserPINNInputs} in \file{user_input.py}.
+Do not paste a second copy of the class at the bottom of the file.
+Leave the physical dataclasses alone unless you intend to change the benchmark.
+
+Every example points \code{storage_url} at a new database.
+The archives, including \file{best_hyperparameters.txt} and the weights, are written under \file{analysis/<database name>/data/} even though no study is created.
+Reusing a production database name replaces that study's saved weights.
+
+The epoch counts below are short enough to confirm that the family builds, trains, and writes its files.
+A production run uses the budgets in the preset you started from: several thousand trial epochs and tens of thousands of final Adam epochs.
+Raise \code{final_adam_epochs}, and the collocation counts, after the short run has written a summary whose family and parameter counts match the banner you expect.
+
+Run each example from the repository root:
+
+\begin{lstlisting}[style=sh]
+python run_pinn.py
+\end{lstlisting}
+
+The process prints the problem name, the constraint mode, the family, an empty tune set, and whether L-BFGS-B is on.
+It then prints \code{Optuna search skipped. Using fixed values from user_input.py} and the final Adam banner.
+
+\section{Classical dam break}
+\label{ex:classical}
+
+This run is a soft wet-bed dam break with two perceptrons and no circuit.
+Width 22 and depth 6 are the scale of the reference dam-break trunk.
+Two towers at that size have 5238 trainable parameters, all classical.
+
+\begin{lstlisting}
+problem_name = "dam_break"
+constraints = "soft"
+model_family = "classical"
+use_optuna = False
+tune_variables = ()
+
+width_value = 22
+depth_value = 6
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+
+storage_url = "sqlite:///optuna_manual_classical_dambreak.db"
+study_name = "manual_classical_dambreak"
+
+use_lbfgs = False
+final_adam_epochs = 200
+final_adam_nx = 41
+final_adam_nt = 41
+show_epoch_output = True
+epoch_output_every = 50
+nx = 101
+nt = 101
+\end{lstlisting}
+
+The banner should contain
+\code{model_family=classical}, \code{width=22}, \code{depth=6},
+\code{n_qubits=0}, \code{q_layers=0},
+\code{quantum_params=0}, and \code{total_params=5238}.
+The IC and BC columns of the epoch table are nonzero, because the constraint mode is soft.
+They fall when the network approaches the initial step and the wall data.
+The mass and momentum columns are the conservation residuals.
+
+After the run, confirm the summary:
+
+\begin{lstlisting}[style=sh]
+sed -n '1,20p' analysis/optuna_manual_classical_dambreak/data/best_hyperparameters.txt
+\end{lstlisting}
+
+The same directory holds \file{best_optuna_model.weights.h5}, \file{best_optuna_model_config.json}, \file{dam_break_losses_data.npz}, and the elevation, velocity, error, and boundary archives.
+PennyLane is not required for this example.
+JAX is imported with the package and is not asked to build a circuit.
+
+\section{Hybrid-quantum tide}
+\label{ex:hybrid}
+
+This run is a hard linear tide.
+Each field keeps a perceptron of width 16 and depth 4, and adds a two-layer, four-qubit reupload circuit.
+Warmup is off, so the residual circuit is present from epoch 1.
+Hard mode makes the IC and BC columns identically zero; the total loss is the PDE residual.
+
+\begin{lstlisting}
+problem_name = "tidal_test"
+constraints = "hard"
+model_family = "hybrid_quantum"
+use_optuna = False
+tune_variables = ()
+
+width_value = 16
+depth_value = 4
+n_qubits_value = 4
+q_layers_value = 2
+embedding_value = "reupload"
+hybrid_classical_warmup_fraction = 0.0
+
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+
+storage_url = "sqlite:///optuna_manual_hybrid_tide.db"
+study_name = "manual_hybrid_tide"
+
+use_lbfgs = False
+final_adam_epochs = 100
+final_adam_nx = 32
+final_adam_nt = 32
+show_epoch_output = True
+epoch_output_every = 25
+nx = 101
+nt = 101
+\end{lstlisting}
+
+Per tower, Equation~\eqref{eq:classical} with \(w=16\) and \(d=4\) gives
+\(P_{\mathrm{C}}=3\cdot 16 + 3\cdot(256+16) + 17 = 881\).
+Equation~\eqref{eq:hybrid-count} then adds the encoder \(16\cdot 4+4=68\), the decoder \(4\cdot 16+16=80\), and the angles \(3\cdot 4\cdot 2=24\), so one tower has 1053 parameters and the model has 2106.
+Of those, \(2\cdot 24=48\) are quantum angles and 2058 are classical weights.
+The banner should report those three numbers, \code{embedding=reupload}, and four qubits with two layers.
+
+The first epoch is slower than a classical step of the same grid, because JAX compiles the circuit.
+Later epochs reuse that compilation.
+If PennyLane is missing, the run stops in \code{QuantumLayer} with the install instruction from \file{swe_pinn/physics/quantum.py}.
+
+To see warmup, set \code{hybrid_classical_warmup_fraction = 0.25} and \code{final_adam_epochs = 40}.
+The log should say that epochs 1 through 10 skip the QNode and that the residual is enabled from epoch 11.
+The quantum parameters are still listed in the banner during the warmup epochs.
+
+\section{Full-quantum vortex}
+\label{ex:full}
+
+This run is a hard gradient-wind vortex.
+There is no hidden perceptron.
+Width and depth may be left at whatever the file already contains; the trainer stores them as 0.
+Four qubits and three reupload layers give, by Equation~\eqref{eq:full-count},
+\[
+P_{\mathrm{F}} = 4\cdot 4 + 1 + 3\cdot 4\cdot 3 = 53
+\]
+parameters per tower.
+Three towers give 159 parameters, of which \(3\cdot 3\cdot 4\cdot 3 = 108\) are circuit angles and 51 are the classical encoders and readouts.
+
+\begin{lstlisting}
+problem_name = "steady_vortex"
+constraints = "hard"
+model_family = "full_quantum"
+use_optuna = False
+tune_variables = ()
+
+n_qubits_value = 4
+q_layers_value = 3
+embedding_value = "reupload"
+
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+
+storage_url = "sqlite:///optuna_manual_full_vortex.db"
+study_name = "manual_full_vortex"
+
+use_lbfgs = False
+final_adam_epochs = 100
+final_adam_nx = 24
+final_adam_nt = 24
+show_epoch_output = True
+epoch_output_every = 25
+nx = 81
+nt = 81
+\end{lstlisting}
+
+The banner should contain \code{model_family=full_quantum}, \code{width=0}, \code{depth=0}, \code{n_qubits=4}, \code{q_layers=3}, \code{embedding=reupload}, \code{quantum_params=108}, and \code{total_params=159}.
+The momentum column is the sum of the two momentum mean squares.
+The archives are \file{steady_vortex_elevation_compare_data.npz}, \file{steady_vortex_velocity_u_compare_data.npz}, \file{steady_vortex_velocity_v_compare_data.npz}, and \file{steady_vortex_error_data.npz}, plus the loss archive.
+Hard mode on this problem lifts the boundary.
+A small loss means the PDE residual is small.
+It does not, by itself, mean the interior matches the exact vortex; that comparison is the analytic report in Chapter~\ref{ch:outputs}.
+
+A full-quantum run with \code{n_qubits_value = 0} or \code{q_layers_value = 0} stops immediately and names the field that must be at least 1.
+Setting \code{hybrid_classical_warmup_fraction} has no effect on this family.
+
+\section{Same problem, three fixed models}
+\label{ex:three-fixed}
+
+A fair look at the three families on one equation uses the same benchmark, the same constraint mode, the same learning rate, the same grids, and the same epoch budget, and writes each family to its own database.
+The eddy lattice is the shipped three-family problem.
+The blocks below share the benchmark, the hard constraint, the learning rate, the grids, and the epoch budget.
+The classical and hybrid blocks also share the trunk.
+The full-quantum block sets the circuit, and width and depth do not enter that model.
+Each block has its own database.
+Hard constraints, a zero warmup, unit PDE weights, and the learning rate \(10^{-3}\) are shared.
+
+Classical, 603 parameters (width 5, depth 7, three towers):
+
+\begin{lstlisting}
+problem_name = "steady_eddies"
+constraints = "hard"
+model_family = "classical"
+use_optuna = False
+tune_variables = ()
+width_value = 5
+depth_value = 7
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+hybrid_classical_warmup_fraction = 0.0
+storage_url = "sqlite:///optuna_manual_eddies_classical.db"
+study_name = "manual_eddies_classical"
+use_lbfgs = False
+final_adam_epochs = 200
+final_adam_nx = 32
+final_adam_nt = 32
+show_epoch_output = True
+epoch_output_every = 50
+\end{lstlisting}
+
+Hybrid, the same trunk plus one qubit and one reupload layer.
+One tower has \(P_{\mathrm{C}}=201\), plus an encoder of 6 weights, a decoder of 10, and 3 angles, so \(P_{\mathrm{H}}=220\).
+Three towers have 660 parameters, of which 9 are quantum angles.
+That model is larger than the shipped search window: the window's 42-parameter hybrid is the other corner, width~1 and depth~2 with the same one-qubit circuit.
+This example keeps the trunk lined up with the classical run, so the extra 57 parameters are only the circuit path.
+
+\begin{lstlisting}
+problem_name = "steady_eddies"
+constraints = "hard"
+model_family = "hybrid_quantum"
+use_optuna = False
+tune_variables = ()
+width_value = 5
+depth_value = 7
+n_qubits_value = 1
+q_layers_value = 1
+embedding_value = "reupload"
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+hybrid_classical_warmup_fraction = 0.0
+storage_url = "sqlite:///optuna_manual_eddies_hybrid.db"
+study_name = "manual_eddies_hybrid"
+use_lbfgs = False
+final_adam_epochs = 200
+final_adam_nx = 32
+final_adam_nt = 32
+show_epoch_output = True
+epoch_output_every = 50
+\end{lstlisting}
+
+The hybrid banner should report 660 total parameters and 9 quantum parameters.
+The trunk matches the classical model.
+The extra 57 parameters are the three encoders, the three decoders, and the nine angles.
+Full quantum cannot use width 5 and depth 7.
+Match it on the circuit instead, here one qubit and one layer (24 parameters, three towers):
+
+\begin{lstlisting}
+problem_name = "steady_eddies"
+constraints = "hard"
+model_family = "full_quantum"
+use_optuna = False
+tune_variables = ()
+n_qubits_value = 1
+q_layers_value = 1
+embedding_value = "reupload"
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+storage_url = "sqlite:///optuna_manual_eddies_full.db"
+study_name = "manual_eddies_full"
+use_lbfgs = False
+final_adam_epochs = 200
+final_adam_nx = 32
+final_adam_nt = 32
+show_epoch_output = True
+epoch_output_every = 50
+\end{lstlisting}
+
+Compare the final total-loss lines and, after Chapter~\ref{ch:outputs}, the relative \(L_{2}\) errors.
+Do not compare these short runs with a finished preset study.
+The preset trains much longer, on a \(48\times 48\) trial lattice and a \(64\times 64\) final lattice.
+
+\section{What the config file records}
+
+\file{best_optuna_model_config.json} is the hyperparameter record of the model that was trained.
+A classical run stores \code{model_family} as \code{classical}, qubits and layers as 0, and the width and depth you set.
+A hybrid run stores the width, depth, qubits, layers, and embedding.
+A full-quantum run stores width 0, depth 0, and the circuit settings.
+The analysis script reloads weights only when this file matches the trial it is about to compare.
+A mismatch causes it to train the architecture again.

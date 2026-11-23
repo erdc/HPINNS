@@ -1,0 +1,80 @@
+\chapter{Introduction}
+\label{ch:intro}
+
+HPINNS is a Python package for shallow-water physics-informed neural networks.
+The network represents water depth and velocity.
+Training minimizes the mean square of the shallow-water residuals at a fixed grid of collocation points, together with a boundary penalty when constraints are soft.
+When the selected benchmark has an exact solution, a later analysis step compares the trained field with that solution.
+
+The package name on disk is \file{swe_pinn}.
+The program you run is \file{run_pinn.py}.
+Every setting that changes from one experiment to the next lives in \file{user_input.py}.
+
+\section{What one run does}
+
+A call to \code{python run_pinn.py} does the following.
+
+\begin{enumerate}
+\item Read \code{USER_PINN_INPUTS} from \file{user_input.py}.
+\item Build the benchmark named by \code{problem_name}.
+  The physical constants for that benchmark come from the matching dataclass at the bottom of the same file.
+\item If a search is requested, draw trials until the completed-trial cap is reached.
+  Each trial builds one network, trains it with Adam, and scores the same loss on a finer lattice.
+\item Rebuild the best completed trial, or the fixed hyperparameters if the search was skipped, and train that model with Adam for \code{final_adam_epochs}.
+\item Optionally continue from those weights with L-BFGS-B.
+\item Write weights, a hyperparameter summary, and NumPy archives of the loss history and the predicted fields.
+\end{enumerate}
+
+Two flags split that sequence so several processes can share one study.
+
+\begin{itemize}
+\item \code{python run_pinn.py --search-only --worker-id N} runs trials only.
+  The sampler seed is \(42+N\).
+  The process does not train the final model.
+\item \code{python run_pinn.py --finalize} loads the best completed trial already stored in the study and runs the final Adam stage, the optional L-BFGS-B stage, and the archives.
+  It adds no trials.
+\end{itemize}
+
+The two flags cannot be combined.
+\file{run_cores.sh} starts several search workers, waits for them, and then runs \code{--finalize} once.
+
+\section{The three families}
+
+Every benchmark can be trained with any of the three families.
+The family is a property of the network, not of the equation.
+
+\begin{description}
+\item[\code{classical}]
+Each field has its own tanh multilayer perceptron.
+There is no circuit.
+Width and depth set the size of each tower.
+
+\item[\code{hybrid_quantum}]
+Each field keeps that perceptron.
+After the last hidden layer the tower adds a residual quantum correction,
+\[
+z \leftarrow z + \operatorname{decode}\!\big(\operatorname{circuit}(\operatorname{encode}(z))\big).
+\]
+The correction is added at full strength on every forward pass after an optional classical warmup.
+A hybrid specification with zero qubits is stored and trained as classical.
+
+\item[\code{full_quantum}]
+There is no hidden perceptron and no residual skip.
+Each field is
+\[
+\operatorname{readout}\!\big(\operatorname{circuit}(\operatorname{encode}(\boldsymbol{\xi}))\big),
+\]
+where \(\boldsymbol{\xi}\) is the pair of coordinates scaled onto the unit interval.
+Width and depth are ignored.
+The qubit count and the layer count must both be at least one.
+\end{description}
+
+Chapter~\ref{ch:families} specifies the circuit, the two embedding layouts, and the parameter counts.
+Chapter~\ref{ch:examples} gives a complete fixed-architecture run for each family.
+Chapter~\ref{ch:search} shows how to put all three families in one Optuna study.
+
+\section{What this manual assumes}
+
+You edit \file{user_input.py}, run the solver from the repository root, and read the text files and archives under \file{analysis/}.
+You do not need to edit the trainer to change the family, the benchmark, the constraint mode, or the search.
+A new benchmark is added by registering a problem builder, which is described briefly in Section~\ref{sec:new-problem}.

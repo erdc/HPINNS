@@ -1,0 +1,129 @@
+\chapter{Troubleshooting}
+\label{ch:trouble}
+
+\section{The family or the counts look wrong}
+
+The banner is the authority.
+Compare it with Table~\ref{tab:counts}.
+
+\begin{itemize}
+\item \code{model_family=classical} together with a positive \code{n_qubits_value} means the run is classical: either you set \code{model_family = "classical"}, or a hybrid specification had zero qubits and was rewritten.
+  The rewrite is printed by the stored family on the trial, which becomes \code{classical}.
+\item \code{width=0} and \code{depth=0} on a full-quantum banner are expected.
+  Those fields do not enter Equation~\eqref{eq:full-count}.
+\item A hybrid total far above the classical total at the same width and depth is the encoder, the decoder, and the angles.
+  Equation~\eqref{eq:hybrid-count} is the check.
+\item Quantum parameters count only the circuit angles, \(3 m n_{q} n_{L}\) for \(m\) fields.
+  Encoder and decoder weights are classical, including on a full-quantum model.
+\end{itemize}
+
+\section{Optuna rejects the study}
+
+A message about a dynamic value space, a categorical distribution, or an incompatible distribution means the new suggestion does not match trials already stored under \code{study_name}.
+The usual edits that cause it are adding or removing a family, adding or removing an embedding, or changing the min, max, or step of width, depth, qubits, or layers.
+
+Point \code{storage_url} at a new file and set a new \code{study_name}.
+Do not reuse the old name inside the new file either, if you copy the database by hand.
+Confirm the path the trainer will open: a relative URL \code{sqlite:///NAME.db} is \file{analysis/NAME/NAME.db}.
+
+\section{The search finishes without training the model you expected}
+
+If \code{n_trials} completed trials are already in the study, a new process adds nothing and trains the current best trial.
+Raise the cap, or use a new study.
+
+If \code{use_optuna} is false, the tune list is empty, or \code{n_trials} is 0, the log says the search was skipped.
+The model that trains is the fixed \code{*_value} architecture.
+That is the behavior of Chapter~\ref{ch:examples}.
+
+\code{--search-only} never trains the final model.
+Run \code{--finalize} after the workers return.
+\code{--finalize} and \code{--search-only} together are an error, and \code{--search-only} without a worker id is an error.
+
+\section{Every quantum trial is discarded}
+
+The parameter window is in force, and the sampled circuits do not fit.
+A full-quantum model with many qubits and layers exceeds \code{total_params_max}.
+A classical model smaller than \code{total_params_min} is discarded as well.
+Read the discard line: it prints the count, the family, and the bounds.
+Either widen the window, using Table~\ref{tab:counts} to recompute the overlap, or shrink \code{n_qubits_max} and \code{q_layers_max}.
+Setting both bounds to \code{None} disables the window.
+Do that in a new study if the old study's interpretation depended on the overlap.
+
+\section{The loss columns}
+
+Hard mode prints IC and BC as zero.
+A nonzero IC or BC value in hard mode means the constraint string was not \code{hard}.
+The legal strings are exactly \code{hard} and \code{soft}, in either letter case.
+
+Soft mode can show a small PDE loss and a large penalty.
+The Optuna objective includes the penalty.
+A flat field can make a steady residual small while missing the boundary data; the penalty is what prevents that trial from winning.
+If the penalty dominates for the whole trial, the boundary weights on the physical dataclass are large relative to the residual, or the network has not yet fit the trace.
+The dam-break weights of 50 on the initial step and 10 on the walls are the reference balance for that problem.
+
+Equal log-weights produce PDE weights \((1,1)\).
+If the mass column is systematically smaller than the momentum column, that is the residual, not a hidden extra factor, as long as both log-weights are zero.
+
+\section{Adam prints nothing}
+
+\code{show_epoch_output} or \code{show_trial_epoch_output} is false, or the stride is larger than the epoch budget.
+The final loss is still stored in the loss archive.
+Trial rows are a separate print and still appear when a trial completes.
+
+\section{Workers fail together}
+
+\begin{itemize}
+\item \code{One or more workers failed} from \file{run_cores.sh} means at least one \file{logs/worker_*.txt} ends in a traceback.
+  Final training was not started.
+\item \code{database is locked} that persists past the 120-second wait usually means a crashed process left a transaction, or two launches are sharing the file.
+  Stop the extra launch.
+  If no process has the database open, remove a stale \file{-wal} only when you have confirmed that no writer is alive.
+  The trainer relocates a legacy database from the repository root or from \file{analysis/<problem name>/} into \file{analysis/<database name>/} on open.
+  Two copies of the same file in those old locations are not merged; an existing destination is left in place.
+\item A worker that cannot import PennyLane fails on its first quantum trial.
+  A classical trial in the same study still completes.
+  Install PennyLane and rerun; completed trials are kept.
+\item An out-of-memory failure on a quantum trial is a large collocation grid times a large circuit.
+  The circuit is evaluated as a statevector, batched over the collocation points.
+  Reduce \code{trial_nx} and \code{trial_nt}, or reduce \code{n_qubits_max}, before raising the worker count.
+\end{itemize}
+
+\section{The analytic comparison retrains}
+
+The script prints that it is training the best trial when the weight file is missing or does not match the architecture.
+Matching requires the same family, sizes, learning rate, weights, and embedding.
+A smoke test that overwrote \file{best_optuna_model.weights.h5} in a production folder is the usual cause.
+Restore the weights from your own copy, or let the script train, which replaces the file with the architecture it selected.
+Keep smoke tests on a separate \code{storage_url}, as in Chapter~\ref{ch:examples}.
+
+The comparison selects the lowest \code{raw_objective}.
+Final training selects Optuna's best objective.
+Section on which trial is best, in Chapter~\ref{ch:search}, is the distinction.
+Quote the trial number from the file you are reading.
+
+\section{Full quantum is slow, and warmup did nothing}
+
+Compilation happens on the first forward pass of each distinct circuit size in the process.
+A search that draws many \((n_{q}, n_{L})\) pairs compiles many circuits.
+That cost is paid again in every worker.
+
+\code{hybrid_classical_warmup_fraction} does not apply to \code{full_quantum}.
+The circuit is the model.
+To keep a hybrid circuit off for the first quarter of a trial, set the fraction to \code{0.25} and confirm the warmup line in the trial log.
+The score is always computed with the circuit on.
+
+\section{Checklist before a long study}
+
+\begin{enumerate}
+\item The banner of a one-trial or fixed run shows the family, the embedding, and the parameter counts you computed.
+\item \code{problem_name}, \code{constraints}, and the physical dataclass are the benchmark you mean to rank.
+\item \code{storage_url} and \code{study_name} are new, or you intend to append to that study.
+\item \code{model_family_options} lists only the families that should appear.
+  A two-family preset is a preset that already removed \code{full_quantum}.
+\item The parameter window matches the number of fields.
+  The numbers 42 and 603 belong to the three-field eddy box.
+\item \code{optuna_n_startup_trials} is above \code{n_trials} when you want equal family draws, and below it when you want TPE to take over.
+\item \code{trial_epochs} is the budget you are willing to rank, and \code{final_adam_epochs} is the budget for the model you will plot.
+\item \code{use_lbfgs} is the choice you want recorded in the summary.
+\item PennyLane imports in a one-line hybrid or full-quantum build before you occupy a queue with hundreds of trials.
+\end{enumerate}

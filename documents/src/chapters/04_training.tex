@@ -1,0 +1,165 @@
+\chapter{Training, constraints, and the loss}
+\label{ch:training}
+
+\section{The scalar loss}
+
+One loss is used for Adam, for L-BFGS-B, and for the Optuna score.
+Let \(r_{m}\) be the mass residual and let \(r_{p,j}\) be the momentum residuals returned by the benchmark.
+One-dimensional problems return one momentum residual.
+The steady square problems return two.
+The logged names are mass and momentum for every benchmark, including the linear tide.
+The PDE pieces are
+\begin{equation}
+L_{m} = \operatorname{mean}(r_{m}^{2}),
+\qquad
+L_{p} = \sum_{j} \operatorname{mean}(r_{p,j}^{2}).
+\end{equation}
+Derivatives are TensorFlow reverse-mode derivatives through the output map, including the hard-constraint transformation.
+There is no test function and no integration by parts.
+
+Logarithmic parameters \(\lambda_{m}\) and \(\lambda_{p}\) (\code{log_w_mass} and \code{log_w_mom}) set the relative equation weights:
+\begin{equation}
+\label{eq:weights}
+(w_{m}, w_{p})
+=
+\frac{\big(e^{\lambda_{m}}, e^{\lambda_{p}}\big)}
+{\tfrac12\big(e^{\lambda_{m}}+e^{\lambda_{p}}\big)}.
+\end{equation}
+Equal logarithms give \((w_{m},w_{p})=(1,1)\), and the two weights always sum to 2.
+These weights multiply only the PDE terms.
+The soft penalty has its own coefficients on the physical dataclass.
+The scalar loss is
+\begin{equation}
+\label{eq:loss}
+L = w_{m} L_{m} + w_{p} L_{p} + L_{\mathrm{soft}}.
+\end{equation}
+In hard mode, \(L_{\mathrm{soft}}=0\).
+The IC and BC columns in the epoch table are the pieces inside \(L_{\mathrm{soft}}\).
+They are already included in the total.
+They are not added a second time.
+
+\section{Hard and soft constraints}
+\label{sec:constraints}
+
+\code{constraints} is \code{hard} or \code{soft}.
+Any other string raises \code{ValueError}.
+
+Soft mode returns the network output unchanged and adds a penalty that pulls selected traces onto prescribed data.
+The penalty weights live on the physical dataclass (\code{soft_w_*} fields), not in the PDE log-weights.
+
+Hard mode builds the output so the prescribed traces are satisfied for any finite network output.
+The penalty is omitted.
+The interior value is that boundary construction plus a factor that vanishes on the constrained boundary, multiplied by the network.
+The construction is different for each benchmark, and it is specified in Chapter~\ref{ch:benchmarks}.
+In particular, hard mode on the solid-body rotation inserts the exact solution in the interior.
+Hard mode on the vortex and on the eddy lattice lifts the boundary traces only.
+
+Every built-in benchmark defines a soft penalty, so both modes are legal on all six problems.
+A custom problem that omits \code{soft_constraint_loss_fn} cannot be run with \code{constraints="soft"}.
+
+\section{Collocation}
+
+Interior points are a fixed tensor product, including both endpoints of each axis.
+Points are not redrawn between epochs.
+The flatten order is every station of the second axis at the first \(x\), then every station of the second axis at the next \(x\).
+For the steady square problems the second axis is \(y\).
+The input fields are still named \code{trial_nt}, \code{score_nt}, \code{final_adam_nt}, and so on.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}ll@{}}
+\toprule
+Setting & Lattice \\
+\midrule
+\code{trial_nx}, \code{trial_nt} & Adam inside each Optuna trial \\
+\code{score_nx}, \code{score_nt} & Objective lattice, after training \\
+\code{final_adam_nx}, \code{final_adam_nt} & Final Adam stage \\
+\code{final_lbfgs_nx}, \code{final_lbfgs_nt} & L-BFGS-B, when enabled \\
+\code{nx}, \code{nt} & Evaluation mesh for archives and the analytic comparison \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both station counts must be at least 2.
+The score lattice does not take another Adam step.
+It is the same strong-form loss, including the soft penalty, on a grid that is usually finer than the training grid.
+The shipped eddy study trains on \(48\times 48\) and scores on \(96\times 96\).
+The figure mesh, often \(201\times 201\), is not a training grid.
+Optuna trials do not write a model-versus-analytic figure.
+That comparison is written once, by \file{analysis/analyze_study.py}, after a model has been trained.
+
+\section{Adam}
+
+Adam uses a constant learning rate \code{lr}.
+The optimizer rescales each weight from the gradient moments.
+The scalar itself does not decay.
+Exponential decay is not exposed in \file{user_input.py}; a decaying rate left the soft dam-break loss on a plateau in the reference setup, and the trainer keeps the constant rate.
+
+The epoch table has six columns: epoch, total loss, mass loss, momentum loss, IC data, and BC data.
+\code{show_epoch_output} and \code{epoch_output_every} control the final stage.
+\code{show_trial_epoch_output} and \code{trial_epoch_output_every} control the table inside each trial.
+A row is printed at epoch~1 and every \(N\)th epoch after that.
+The header is printed once per stage.
+
+\code{trial_epochs} is the budget used to rank a trial.
+\code{final_adam_epochs} is a separate, usually longer, budget for the model that is kept.
+The final stage is not itself an Optuna trial.
+
+\section{L-BFGS-B}
+
+\code{use_lbfgs} continues from the Adam weights with SciPy L-BFGS-B on the same trainable variables and the same total loss.
+\code{final_lbfgs_max_iters} is an iteration cap.
+\code{final_lbfgs_maxfun} is a separate cap on loss and gradient evaluations.
+\code{final_lbfgs_ftol} stops on a small relative decrease of the loss.
+\code{final_lbfgs_gtol} stops on a small projected gradient.
+The shipped \file{user_input.py} sets \code{use_lbfgs = False}, which keeps the Adam weights and still writes the summary and the archives.
+The summary then records that L-BFGS-B was skipped.
+
+\section{How a trial is scored}
+\label{sec:objective}
+
+After \code{trial_epochs} of Adam, the trial is ranked on \(L\) evaluated on the score lattice.
+The value stored as \code{raw_objective} is that loss, including the soft penalty.
+Optuna may minimize a transformed number.
+\code{parameter_objective_mode} selects the transformation, and \code{optimize_total_parameters} is the master switch.
+Parameter counts are stored on the trial in every mode.
+
+\begin{description}
+\item[\code{raw_loss}]
+The objective is \(L\).
+This is also the value returned when \code{optimize_total_parameters} is false, for every mode.
+
+\item[\code{loss_multiplier}]
+The objective is
+\[
+L \left(1 + \alpha \frac{N}{N_{\mathrm{ref}}}\right),
+\]
+where \(N\) is the trainable-parameter count, \(\alpha\) is \code{total_params_objective_weight}, and \(N_{\mathrm{ref}}\) is \code{total_params_reference}.
+A weight of 0 returns \(L\).
+
+\item[\code{target_error_min_params}]
+The objective is
+\[
+\frac{N}{N_{\mathrm{ref}}}
++ W \max\!\left(0,\, \frac{L - L_{\star}}{L_{\star}}\right),
+\]
+where \(L_{\star}\) is \code{target_raw_objective} and \(W\) is \code{target_error_constraint_weight}.
+The excess term is zero once \(L \le L_{\star}\).
+This mode requires \(L_{\star}>0\).
+Set \(L_{\star}\) from a finished classical baseline on the same problem before using the mode.
+The multiplier weight \(\alpha\) is logged and does not enter this formula.
+\end{description}
+
+The score is a residual loss.
+It is not an \(L^{2}\) error against the exact depth or velocity.
+Field errors are computed on the evaluation mesh after the final model is trained.
+
+\section{Reading the trial table}
+
+Each finished trial prints one row to the terminal, including when the worker's standard output has been redirected to a log file.
+The row contains the trial number, family, width, depth, qubits, layers, an embedding column when the layout can vary, the learning rate and log-weights when those values can differ from the fixed defaults, the classical, quantum, and total parameter counts, the mass, momentum, IC, and BC pieces of the score, the Optuna objective, the wall-clock minutes, and the count of completed trials against the cap.
+
+A draw whose parameter count falls outside \code{total_params_min} or \code{total_params_max} is discarded before training.
+The terminal says \code{Trial N discarded}, the trial is pruned, and it does not count toward \code{n_trials}.
+A trial that raises is printed as \code{FAILED} together with a traceback in the process log.
+Failed trials do not count as completed.

@@ -1,0 +1,210 @@
+\chapter{Built-in benchmarks}
+\label{ch:benchmarks}
+
+\code{problem_name} selects the builder.
+The physical numbers come from the dataclass instantiated at the bottom of \file{user_input.py}.
+The solver does not mix parameters across benchmarks.
+Changing \code{g}, a domain limit, or a boundary weight means editing that dataclass, not \code{USER_PINN_INPUTS}.
+
+All six benchmarks define an exact or reference solution, a soft penalty, and a hard output map.
+Table~\ref{tab:problems} is the index.
+The second coordinate of the steady problems is \(y\).
+
+\begin{table}[ht]
+\centering
+\caption{Built-in benchmarks. The field count is the number of network towers.}
+\label{tab:problems}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\code{problem_name} & Fields & Second axis & Default idea \\
+\midrule
+\code{tidal_test} & 2 & time & linear tide, exact solution \\
+\code{dam_break} & 2 & time & wet-bed Stoker problem \\
+\code{transcritical_bump} & 2 & dummy time & steady jump over a bump \\
+\code{steady_rotation} & 3 & \(y\) & solid-body rotation \\
+\code{steady_vortex} & 3 & \(y\) & gradient-wind vortex \\
+\code{steady_eddies} & 3 & \(y\) & Fourier eddies on a carved bed \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Linear tidal test}
+
+\code{problem_name = "tidal_test"} builds a linear tide in a flat basin of length \(L\), undisturbed depth \(H\), and linear friction \(r\).
+The free-surface amplitude at the forced end is \(A\), and the period is \(T_{\mathrm{tide}}\) (the default is 12.42~hours).
+The trainer works in nondimensional \(x\in[0,1]\) and \(\tau\) from 0 to \code{tau_max}, with \(\tau\) in units of the tidal period.
+The default window is three tidal periods.
+The comparison archives convert elevation back by \(A\), velocity by \(A L/(H T_{\mathrm{tide}})\), \(x\) to kilometers, and time to hours.
+
+The residuals are the linear continuity and momentum balances,
+\[
+\eta_{\tau} + u_{x} = 0,
+\qquad
+u_{\tau} + \alpha \eta_{x} + \beta u = 0,
+\]
+with \(\alpha = g H T_{\mathrm{tide}}^{2}/L^{2}\) and \(\beta = r T_{\mathrm{tide}}\).
+The exact solution is the complex wave number that satisfies those equations with the basin boundary data.
+
+Hard mode matches that exact solution on \(\tau=0\), on \(x=0\), and on \(x=1\).
+The interior is the transfinite blend of those three traces plus \(\tau\, x\,(1-x)\) times the network.
+The collocation loss is the PDE residual.
+The exact interior solution is not pasted into the domain.
+
+Soft mode penalizes the network against the exact initial elevation and velocity, and against the exact elevation and velocity on both ends.
+The default weights, used when the dataclass does not override them, are 20 on each initial field and 10 on each boundary field.
+Sample counts default to 2048 initial points and 1024 points on each end, drawn uniformly at random on each penalty evaluation.
+
+\section{Wet-bed dam break}
+
+\code{problem_name = "dam_break"} is the scaled Stoker problem used by the reference dam-break study:
+\(g=9.81\,\mathrm{m\,s^{-2}}\), left depth \(0.5\,\mathrm{m}\), right depth \(0.25\,\mathrm{m}\), still water, \(x\in[0,1]\,\mathrm{m}\), \(t\in[0,0.2]\,\mathrm{s}\), dam at \(x=0.5\,\mathrm{m}\).
+The reference solution is the wet-bed Riemann solution.
+
+The residuals are the one-dimensional conservation laws
+\[
+h_{t} + (hu)_{x} = 0,
+\qquad
+(hu)_{t} + \big(hu^{2} + \tfrac12 g h^{2}\big)_{x} = 0.
+\]
+
+\code{transition_width = 0} keeps the sharp initial step.
+A positive width replaces the step by a \(\tanh\) jump of that scale, in meters.
+
+Hard mode sets
+\[
+h = h_{0}(x) + \hat{t}\,\hat{x}\,(1-\hat{x})\, h_{\mathrm{net}},
+\qquad
+u = u_{0} + \hat{t}\,\hat{x}\,(1-\hat{x})\, u_{\mathrm{net}},
+\]
+where hats denote coordinates scaled to \([0,1]\) and \(h_{0}\) is the initial step.
+At \(t=0\) and on both walls the network contribution vanishes, so the depth on each wall stays at the initial depth of that wall and the velocity stays at \(u_{0}\).
+
+Soft mode penalizes the initial step and the two walls separately.
+The default loss is
+\[
+L_{m} + L_{p} + 50\,\mathrm{MSE}(h_{\mathrm{IC}}) + 50\,\mathrm{MSE}(u_{\mathrm{IC}})
++ 10\,\mathrm{MSE}(h_{\mathrm{BC}}) + 10\,\mathrm{MSE}(u_{\mathrm{BC}}).
+\]
+The default 41 initial samples are packed toward the dam.
+Each wall has 10 samples, uniform in time.
+The network sees time in the first column and \(x\) in the second.
+The other benchmarks pass \(x\) first.
+You do not set that order; it is part of the dam-break builder.
+
+\section{Transcritical bump}
+
+\code{problem_name = "transcritical_bump"} is steady, frictionless flow over a parabolic bump with a stationary hydraulic jump.
+The channel is \(x\in[0,25]\,\mathrm{m}\).
+The bed is \(z = 0.2 - 0.05(x-10)^{2}\) for \(8<x<12\) and zero elsewhere.
+The upstream unit discharge is \(q=0.18\,\mathrm{m^{2}\,s^{-1}}\) and the downstream depth is \(h=0.33\,\mathrm{m}\).
+The reference solution follows from constant discharge and the specific-energy relation on each smooth branch.
+The jump is placed where the Rankine--Hugoniot momentum condition changes sign.
+
+The residuals are the steady balances with bed slope and no friction,
+\[
+(hu)_{x} = 0,
+\qquad
+\big(hu^{2} + \tfrac12 g h^{2}\big)_{x} + g h z_{x} = 0.
+\]
+The trainer still carries a time coordinate, on the dummy interval \([0,1]\).
+The network is always evaluated at \(t=0\), so the learned field does not depend on time.
+
+Hard mode enforces the mixed physical data exactly:
+downstream depth is \(h(L)=h_{\mathrm{down}}\) for any network output, and upstream discharge is \(h(0)u(0)=q_{\mathrm{in}}\).
+Upstream depth and downstream velocity remain free.
+Soft mode penalizes those two conditions, each with default weight 50, and does not prescribe both \(h\) and \(u\) at each end.
+
+\section{Steady solid-body rotation}
+
+\code{problem_name = "steady_rotation"} is a steady square flow,
+\[
+u = -\omega y, \qquad v = \omega x,
+\qquad
+h = h_{\mathrm{center}} + \frac{\omega^{2}(x^{2}+y^{2})}{2g},
+\]
+on a flat frictionless bed.
+The default square is \([-1,1]\times[-1,1]\), with \(\omega=1\,\mathrm{s^{-1}}\) and \(h_{\mathrm{center}}=1\,\mathrm{m}\).
+The residuals are the steady conservative shallow-water equations with no friction and no bed slope.
+There is no time axis.
+\code{trial_nx} and \code{trial_nt} are the \(x\) and \(y\) station counts.
+
+Hard mode returns the exact field plus a bubble \(s_{x}(1-s_{x})s_{y}(1-s_{y})\) times the network, where \(s_{x}\) and \(s_{y}\) are the coordinates scaled to \([0,1]\).
+The bubble is zero on the boundary, so the boundary values are exact.
+A zero network is already the exact solution everywhere, because the exact field is part of the output.
+This benchmark is a useful wiring check.
+It is a weak test of whether a family can represent an unknown interior.
+
+Soft mode penalizes \(h\), \(u\), and \(v\) on the four edges against the exact traces.
+The default edge has 32 stations, and each field weight defaults to 50.
+
+\section{Steady vortex}
+
+\code{problem_name = "steady_vortex"} is an isolated vortex in gradient-wind balance on a flat bed.
+The azimuthal speed is \(\omega r \exp(-r^{2}/(2\sigma^{2}))\), the radial velocity is zero, and the free surface satisfies
+\[
+\frac{v_{\theta}^{2}}{r} + f v_{\theta} = g \frac{\partial h}{\partial r}.
+\]
+The default Coriolis parameter is \(f=2\,\mathrm{s^{-1}}\), a rotating-table value rather than the planetary one.
+Set \(f=0\) on \code{SteadyVortexParameters} for a non-rotating bucket vortex.
+The default core rate is \(\omega=4\,\mathrm{s^{-1}}\), the speed peaks at \(r=\sigma=0.45\,\mathrm{m}\), and the central depth is \(0.40\,\mathrm{m}\).
+The square is \([-1.5,1.5]\times[-1.5,1.5]\), several vortex radii across, so the boundary velocity is a small fraction of the peak.
+Continuity is satisfied identically.
+There is no manufactured body force.
+
+Hard mode lifts the boundary traces with a Coons patch and adds the same boundary-vanishing bubble times the network.
+The exact interior solution is not inserted.
+Soft mode penalizes all three fields on the four edges against the exact boundary values, with the same default station count and weights as the rotation problem.
+
+\section{Steady eddy lattice}
+
+\code{problem_name = "steady_eddies"} is the benchmark selected by the shipped \file{user_input.py}.
+The stream function is a degenerate Fourier pair
+\[
+\psi = A \big[
+\sin(m\pi x/L)\sin(n\pi y/L)
++ \sin(n\pi x/L)\sin(m\pi y/L)
+\big],
+\]
+with velocity \((\psi_{y},-\psi_{x})\) and depth \(H_{0}+\gamma\psi\).
+Both mode pairs share the eigenvalue \(\mu=(m^{2}+n^{2})\pi^{2}/L^{2}\).
+The free surface that balances advection is
+\[
+\eta = C - \frac{|\mathbf{u}|^{2}}{2g} - \frac{\mu\psi^{2}}{2g},
+\]
+and the bed is \(z=\eta-h\).
+Continuity and momentum hold identically.
+There is no manufactured body force and no shock.
+The walls are slip walls: depth equals \(H_{0}\) and the normal velocity vanishes.
+The defaults are \(A=0.015\,\mathrm{m^{2}\,s^{-1}}\), \(H_{0}=0.80\,\mathrm{m}\), \(\gamma=4\), modes \((m,n)=(7,4)\), Bernoulli constant \(C=1\), and the unit square.
+Keep \(C\) large enough that the bed stays below the free surface.
+Mode~7 needs more than twenty stations across the square; the shipped trial lattice uses 48.
+
+Hard mode is the Coons lift of the boundary traces plus the bubble times the network.
+The exact interior is not inserted.
+Soft mode enforces the slip condition only: depth equals \(h_{\mathrm{mean}}\) on the walls, and the normal velocity vanishes.
+Tangential speed is left free so that penalty does not dominate the Optuna score.
+\code{soft_w_u} and \code{soft_w_v} are averaged into the normal-velocity weight.
+
+\section{Choosing a constraint mode}
+
+Use hard mode when the boundary traces should be exact for every set of weights, and the loss should be the PDE residual alone.
+That is the shipped choice for the tide and for the eddy lattice.
+
+Use soft mode when the boundary data are mixed, or when you want the penalty weights to be part of the experiment.
+The dam-break reference and the bump preset use soft mode.
+The bump's hard map already enforces the mixed discharge and depth conditions, so hard mode is also a valid bump run.
+Give the bump a new \code{study_name} if you change the constraint mode of an existing study; the trials are not comparable across modes.
+
+Use a new database whenever you change \code{problem_name}.
+Trials from the tide and trials from the dam break must not share a study.
+The loss values are residuals of different equations.
+
+\section{Adding a benchmark}
+\label{sec:new-problem}
+
+A new case is a builder that returns a \code{Problem} from \file{swe_pinn/physics/common.py}: a name, a \code{Domain1D}, a residual function, an output function, and, when you want soft mode or an analytic comparison, a soft-penalty function and an exact solution.
+Register the name in \code{build_problem} in \file{swe_pinn/problems/__init__.py}, and add a dataclass to \file{user_input.py}.
+The residual returns two tensors for a one-dimensional problem or three tensors for a steady \((x,y)\) problem.
+Set \code{n_outputs} to 2 or 3 to match.
+The trainer, the three families, and the Optuna loop stay as they are.
+Point \code{storage_url} and \code{study_name} at a new study before the first trial.

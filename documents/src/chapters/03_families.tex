@@ -1,0 +1,231 @@
+\chapter{The three model families}
+\label{ch:families}
+
+The network class is \code{PINN} in \file{swe_pinn/physics/common.py}.
+Every family accepts two scaled coordinates and returns one scalar per field, concatenated along the last axis.
+One-dimensional benchmarks return \((h,u)\) or \((\eta,u)\).
+The three steady square benchmarks return \((h,u,v)\).
+Each field has its own tower.
+There is no shared trunk.
+
+Coordinates are scaled onto \([0,1]\) before they enter the network.
+Dense-layer kernels use Glorot normal initialization and zero biases.
+Hidden layers use \(\tanh\).
+Output layers are linear.
+Circuit angles are drawn from a normal distribution with mean zero and standard deviation \(0.1\).
+\code{build_model} resets the NumPy and TensorFlow seeds to 42 before constructing the network, so a given architecture starts from the same weights in every trial and in the final training.
+
+The legal names are \code{classical}, \code{hybrid_quantum}, and \code{full_quantum}.
+Any other string raises \code{ValueError} and lists those three names.
+
+\section{Classical}
+\label{sec:classical}
+
+Set
+\begin{lstlisting}
+model_family = "classical"
+\end{lstlisting}
+Each tower is a stack of \code{depth} hidden layers of width \code{width}, followed by a linear unit.
+The circuit is not built.
+\code{n_qubits}, \code{q_layers}, and \code{embedding} are ignored, and the stored embedding is \code{once}.
+
+For one tower with two inputs and depth \(d\ge 1\), the trainable count is
+\begin{equation}
+\label{eq:classical}
+P_{\mathrm{C}}
+= 3w + (d-1)(w^{2}+w) + (w+1),
+\end{equation}
+where \(w\) is the width.
+The first term is the map from the two coordinates into the first hidden layer.
+The last term is the linear readout.
+An \(m\)-field model has \(m P_{\mathrm{C}}\) parameters, all of them classical.
+The banner prints \code{quantum_params=0}.
+
+The shipped search ranges use \(d\ge 2\).
+Equation~\eqref{eq:classical} is the count for that regime.
+A depth of~1 is a single hidden layer: \(P_{\mathrm{C}}=4w+1\).
+
+\section{Hybrid quantum}
+\label{sec:hybrid}
+
+Set
+\begin{lstlisting}
+model_family = "hybrid_quantum"
+n_qubits_value = 4
+q_layers_value = 2
+embedding_value = "reupload"
+\end{lstlisting}
+The classical towers are unchanged.
+After the last hidden layer of each tower the forward pass adds
+\begin{equation}
+\label{eq:hybrid}
+z \leftarrow z +
+\operatorname{decode}\!\big(
+\operatorname{circuit}(\operatorname{encode}(z))
+\big).
+\end{equation}
+The corrected state then enters the linear output layer.
+Each tower has its own encoder, circuit, and decoder.
+The correction is not multiplied by a trainable gate.
+
+The encoder maps the \(w\)-dimensional hidden state to one feature per qubit.
+The decoder is a \(\tanh\) dense map from the Pauli-\(Z\) expectations back to width \(w\).
+With the \code{once} embedding the encoder uses \(\tanh\).
+With \code{reupload} the encoder is linear, so a coordinate weight can grow past one radian.
+
+A hybrid value of \code{n_qubits} equal to 0 is rewritten as \code{classical} before training, and the circuit is not built.
+Keep \code{n_qubits_min} at 1 or more when the name is being searched, so a quantum trial actually contains a circuit.
+\code{q_layers} must be at least 1 whenever the circuit is built.
+
+For one or more qubits the count per tower is
+\begin{equation}
+\label{eq:hybrid-count}
+P_{\mathrm{H}}
+= P_{\mathrm{C}}
++ (wn_{q}+n_{q})
++ (n_{q}w+w)
++ 3n_{q}n_{L}.
+\end{equation}
+The three added terms are the encoder, the decoder, and the circuit rotations.
+The banner splits them: encoder and decoder are classical, and the \(3n_{q}n_{L}\) angles are quantum.
+An \(m\)-field model multiplies \(P_{\mathrm{H}}\) by \(m\).
+
+\subsection{Classical warmup}
+
+\code{hybrid_classical_warmup_fraction} is the fraction of Adam epochs, in a trial and again in the final stage, during which a hybrid tower skips the circuit.
+The quantum variables still exist.
+Their gradients are replaced by zeros so Adam's variable list does not change when the circuit turns on.
+A fraction of 0 keeps the circuit on from epoch 1.
+The fraction is clamped to the epoch budget.
+The shipped \file{user_input.py} sets the fraction to 0.
+
+Warmup applies only to \code{hybrid_quantum}.
+A full-quantum model has no classical trunk to train first, and the fraction does not change that family.
+After a hybrid trial the circuit is switched back on before the score lattice is evaluated.
+
+\section{Full quantum}
+\label{sec:full}
+
+Set
+\begin{lstlisting}
+model_family = "full_quantum"
+n_qubits_value = 4
+q_layers_value = 2
+embedding_value = "reupload"
+\end{lstlisting}
+Width and depth are stored as 0 and are not sampled.
+Both \code{n_qubits} and \code{q_layers} must be at least 1.
+A smaller value raises \code{ValueError} and names the field to raise.
+
+Let \(\boldsymbol{\xi}\in\mathbb{R}^{2}\) be the two coordinates after scaling onto the unit interval.
+For the tide, the dam break, and the bump, those coordinates are scaled space and time.
+For the steady square problems they are scaled \(x\) and \(y\).
+Each tower is
+\begin{equation}
+\label{eq:full}
+\operatorname{readout}\!\big(
+\operatorname{circuit}(\operatorname{encode}(\boldsymbol{\xi}))
+\big).
+\end{equation}
+The encoder maps the two coordinates to \(n_{q}\) features.
+The readout maps the \(n_{q}\) expectations to one scalar.
+Both maps are classical dense layers.
+There is no residual skip around the circuit.
+
+The count per tower is
+\begin{equation}
+\label{eq:full-count}
+P_{\mathrm{F}}
+= 4n_{q} + 1 + 3n_{q}n_{L}.
+\end{equation}
+The term \(4n_{q}+1\) is the encoder (\(3n_{q}\) weights) plus the linear readout (\(n_{q}+1\)).
+The banner reports those weights as classical and the \(3n_{q}n_{L}\) angles as quantum.
+An \(m\)-field model has \(m P_{\mathrm{F}}\) parameters.
+The family name means that the tower has no hidden perceptron.
+The encoder and the readout are still classical trainable parameters.
+
+\section{The circuit}
+\label{sec:circuit}
+
+Both quantum families use \code{QuantumLayer}.
+The trainable tensor \(\theta\) has shape \code{(q_layers, n_qubits, 3)}.
+That is \(3 n_{q} n_{L}\) angles per tower.
+
+Two layouts are legal: \code{once} and \code{reupload}.
+A classical model does not use either one.
+
+\begin{description}
+\item[\code{once}]
+The encoder uses \(\tanh\).
+\code{AngleEmbedding} places those features on the qubits with \(Y\) rotations, once, before the variational layers.
+Each layer is then an input-independent \code{Rot} on every qubit, followed by the CNOT ring.
+
+\item[\code{reupload}]
+The encoder is linear.
+The same features are embedded again, as \(Y\) rotations, at the start of every variational layer, and the trainable \code{Rot} follows that embedding.
+\end{description}
+
+After the rotations, a layer with more than one qubit applies CNOT gates from qubit \(i\) to \(i+1\) and a closing CNOT from the last qubit to the first.
+A one-qubit layer is only the rotation.
+The circuit returns the Pauli-\(Z\) expectation of every qubit.
+
+The device is PennyLane \code{default.qubit}.
+JAX vectorizes the circuit over the collocation batch with one shared set of angles, then just-in-time compiles the circuit and its derivatives.
+TensorFlow still owns \(\theta\) and the tape that forms the PDE residual.
+A custom gradient returns the circuit's vector--Jacobian product with respect to the features and the angles.
+The feature product is differentiated again, which is the second derivative a residual needs when a slope of the network updates the angles.
+The first quantum model in a process pays the compilation cost.
+Later epochs of the same architecture reuse the compiled circuit.
+
+Fix \code{embedding_value} to give every quantum tower the same layout.
+Put \code{"embedding"} in \code{tune_variables} only when a study should compare layouts, and list the candidates in \code{embedding_options}.
+The shipped studies fix \code{reupload} and leave \code{embedding} out of the search.
+
+\section{Parameter counts you can check}
+\label{sec:counts}
+
+The banner printed at the start of Adam training reports classical, quantum, and total trainable parameters.
+Table~\ref{tab:counts} is the count from Equations~\eqref{eq:classical}--\eqref{eq:full-count}.
+A run that disagrees with this table is using a different width, depth, qubit count, layer count, or number of fields.
+
+\begin{table}[ht]
+\centering
+\caption{Trainable-parameter counts for the formulas in this chapter.
+Two-field models are the tide, the dam break, and the bump.
+Three-field models are the steady square problems.}
+\label{tab:counts}
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Family & Fields & \(w\) & \(d\) & \(n_{q}\) & \(n_{L}\) & Quantum & Total \\
+\midrule
+classical & 2 & 22 & 6 & 0 & 0 & 0 & 5238 \\
+classical & 3 & 5 & 7 & 0 & 0 & 0 & 603 \\
+classical & 3 & 1 & 2 & 0 & 0 & 0 & 21 \\
+hybrid & 2 & 22 & 6 & 4 & 2 & 48 & 5690 \\
+hybrid & 3 & 1 & 2 & 1 & 1 & 9 & 42 \\
+full quantum & 2 & --- & --- & 4 & 2 & 48 & 82 \\
+full quantum & 3 & --- & --- & 1 & 1 & 9 & 24 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The three-field hybrid row is the lower edge of the parameter window in the shipped eddy study: width~1, depth~2, one qubit, and one layer.
+The three-field classical row with width~5 and depth~7 is the upper edge of that same window.
+Section~\ref{sec:window} explains why the window is set from those two edges.
+
+\section{What each family is for}
+
+Use the classical family when you want a baseline perceptron, when PennyLane is not installed, or when a search should vary only width and depth.
+
+Use the hybrid family when the perceptron should carry the smooth part of the field and the circuit should supply a residual correction.
+Warmup is available only for this family.
+Width and depth still matter, and they are sampled together with the circuit size when those names are listed.
+
+Use the full-quantum family when the field itself should be a readout of the circuit.
+Width and depth do not change the model.
+The capacity is the qubit count, the layer count, and the embedding.
+The encoder and readout remain classical, so the banner's classical count is not zero.
+
+All three families share the loss, the collocation grids, the Adam loop, the optional L-BFGS-B stage, and the archive format.
+A comparison across families is a comparison of those networks on that shared trainer.
+Chapter~\ref{ch:search} is the procedure for putting them in one study.

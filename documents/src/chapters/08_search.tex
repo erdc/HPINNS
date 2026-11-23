@@ -1,0 +1,327 @@
+\chapter{Searching across families}
+\label{ch:search}
+
+A search draws a new architecture for each trial, trains it for \code{trial_epochs}, and records the score.
+The final Adam run happens after the cap is reached, on the single best completed trial, and it starts from a fresh initialization.
+
+\section{Three families, one study}
+\label{ex:three-search}
+
+This is the shipped eddy experiment, reduced to a handful of trials so you can see one row from each family.
+Copy the ranges from the active \file{user_input.py} and change the budget, the database, and the study name.
+The production file uses 500 completed trials, 4000 epochs per trial, and 45000 final Adam epochs.
+
+\begin{lstlisting}
+problem_name = "steady_eddies"
+constraints = "hard"
+model_family = "hybrid_quantum"  # used only when the family is not tuned
+
+model_family_options = (
+    "classical",
+    "hybrid_quantum",
+    "full_quantum",
+)
+embedding_value = "reupload"
+embedding_options = ("reupload",)
+
+use_optuna = True
+tune_variables = (
+    "model_family",
+    "width",
+    "depth",
+    "n_qubits",
+    "q_layers",
+)
+
+use_family_specific_search_ranges = True
+classical_width_min = 1
+classical_width_max = 5
+classical_width_step = 1
+classical_depth_min = 2
+classical_depth_max = 7
+hybrid_width_min = 1
+hybrid_width_max = 5
+hybrid_width_step = 1
+hybrid_depth_min = 2
+hybrid_depth_max = 7
+
+n_qubits_min = 1
+n_qubits_max = 8
+q_layers_min = 1
+q_layers_max = 8
+
+# Three-tower overlap of the box above. See Table of parameter counts.
+total_params_min = 42
+total_params_max = 603
+
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+hybrid_classical_warmup_fraction = 0.0
+parameter_objective_mode = "raw_loss"
+optimize_total_parameters = True
+
+n_trials = 9
+optuna_n_startup_trials = 2000
+trial_epochs = 50
+trial_nx = 24
+trial_nt = 24
+score_nx = 32
+score_nt = 32
+
+final_adam_epochs = 100
+final_adam_nx = 32
+final_adam_nt = 32
+show_trial_epoch_output = False
+show_epoch_output = True
+epoch_output_every = 25
+use_lbfgs = False
+
+storage_url = "sqlite:///optuna_manual_eddies_three_family.db"
+study_name = "manual_eddies_three_family"
+\end{lstlisting}
+
+Launch it with one process:
+
+\begin{lstlisting}[style=sh]
+python run_pinn.py
+\end{lstlisting}
+
+What you should see:
+
+\begin{itemize}
+\item A line naming the joint search, the three families, the tune set, \code{n_startup_trials=2000}, and the completed-trial cap.
+\item A line saying the search runs until 9 completed trials, each with at least 42 and at most 603 parameters.
+\item Discard messages for draws outside that window.
+  Those trials are absent from the completed count.
+\item One table row per completed trial.
+  Classical rows show qubits and layers as 0.
+  Full-quantum rows show width and depth as 0.
+  Hybrid rows show a positive width, depth, qubit count, and layer count, and the embedding \code{reupload}.
+\item Because the startup count is above the cap, families are drawn with equal probability.
+  Nine trials will not split exactly three and three and three, but a single family should not take the whole table.
+\item After the ninth completion, a \code{Best trial params} listing and a final Adam banner for whichever completed trial had the lowest objective.
+\end{itemize}
+
+The learning rate is absent from \code{tune_variables}, so every family uses \(10^{-3}\).
+The log-weights are absent, so every family uses PDE weights \((1,1)\).
+Width and depth are sampled for classical and hybrid trials and skipped for full-quantum trials.
+Qubits and layers are sampled for the two quantum families and skipped for classical trials.
+
+The database is
+\file{analysis/optuna_manual_eddies_three_family/optuna_manual_eddies_three_family.db}.
+Rerunning the same command continues that study.
+If nine trials are already complete, the process adds none and goes straight to final training.
+Raise \code{n_trials} to append more, or change both \code{storage_url} and \code{study_name} to start over.
+
+\section{One family, circuit size only}
+
+To tune the circuit of a hybrid model and hold the trunk fixed, omit \code{model_family}, \code{width}, and \code{depth} from the tune list.
+
+\begin{lstlisting}
+problem_name = "tidal_test"
+constraints = "hard"
+model_family = "hybrid_quantum"
+model_family_options = ("hybrid_quantum",)
+use_optuna = True
+tune_variables = ("n_qubits", "q_layers")
+
+width_value = 16
+depth_value = 4
+lr_value = 1.0e-3
+log_w_mass_value = 0.0
+log_w_mom_value = 0.0
+embedding_value = "reupload"
+n_qubits_min = 1
+n_qubits_max = 4
+q_layers_min = 1
+q_layers_max = 3
+
+total_params_min = None
+total_params_max = None
+n_trials = 6
+optuna_n_startup_trials = 6
+trial_epochs = 40
+trial_nx = 24
+trial_nt = 24
+score_nx = 32
+score_nt = 32
+final_adam_epochs = 80
+final_adam_nx = 32
+final_adam_nt = 32
+show_trial_epoch_output = False
+use_lbfgs = False
+
+storage_url = "sqlite:///optuna_manual_hybrid_circuit.db"
+study_name = "manual_hybrid_circuit"
+\end{lstlisting}
+
+Every completed row should say \code{hybrid_quantum}, width 16, and depth 4.
+Qubits and layers should vary inside the boxes above.
+\code{model_family_options} is unused while the family is not tuned, but a one-element tuple documents the intent and keeps a later edit from accidentally opening the other families inside this study name.
+If you later add \code{"model_family"} to \code{tune_variables} on this same \code{study_name}, change the study name first.
+
+The same pattern with \code{model_family = "full_quantum"} and the same tune list searches only the circuit.
+Width and depth in the file are ignored.
+A classical circuit search is empty: drop \code{n_qubits} and \code{q_layers}, and list \code{"width"} and \code{"depth"} instead.
+
+\section{Classical width and depth}
+
+\begin{lstlisting}
+problem_name = "dam_break"
+constraints = "soft"
+model_family = "classical"
+use_optuna = True
+tune_variables = ("width", "depth")
+use_family_specific_search_ranges = True
+classical_width_min = 8
+classical_width_max = 24
+classical_width_step = 8
+classical_depth_min = 2
+classical_depth_max = 4
+
+n_trials = 4
+optuna_n_startup_trials = 4
+trial_epochs = 30
+trial_nx = 21
+trial_nt = 21
+score_nx = 41
+score_nt = 41
+final_adam_epochs = 60
+show_trial_epoch_output = False
+use_lbfgs = False
+total_params_min = None
+total_params_max = None
+
+storage_url = "sqlite:///optuna_manual_classical_search.db"
+study_name = "manual_classical_search"
+\end{lstlisting}
+
+Widths fall on 8, 16, and 24.
+Depths fall on 2, 3, and 4.
+The table's qubit and layer columns stay at 0.
+
+\section{Learning rate and loss weights}
+
+Add \code{"lr"} to \code{tune_variables} to sample the Adam rate log-uniformly between \code{lr_min} and \code{lr_max}, for whichever family the trial drew.
+Add \code{"log_w_mass"} or \code{"log_w_mom"} to sample the logarithms in Equation~\eqref{eq:weights}.
+Sampling either logarithm prints both log-weight columns.
+Leaving both at zero and out of the tune list hides those columns, because the weights are then identically \((1,1)\).
+
+Add \code{"embedding"} only when \code{embedding_options} contains more than one layout.
+A one-element tuple makes every quantum trial use that layout, and the embedding column stays hidden unless the fixed value is something other than \code{once} or the name is being tuned.
+The shipped reupload studies show the column because \code{embedding_value} is \code{reupload}.
+
+\section{Parameter-aware objectives}
+
+To minimize the raw loss, keep the shipped mode:
+
+\begin{lstlisting}
+parameter_objective_mode = "raw_loss"
+optimize_total_parameters = True
+\end{lstlisting}
+
+\code{optimize_total_parameters = False} also returns the raw loss, for any mode.
+Counts are still stored.
+
+To charge a model for its size, set
+
+\begin{lstlisting}
+optimize_total_parameters = True
+parameter_objective_mode = "loss_multiplier"
+total_params_objective_weight = 1.0
+total_params_reference = 1000.0
+\end{lstlisting}
+
+A model with \(N_{\mathrm{ref}}\) parameters is scored as \(2L\).
+A model with half that many parameters is scored as \(1.5L\).
+Choose the reference near the middle of the window you care about.
+With the shipped reference of \(10^{5}\) and a few hundred parameters, the factor is about \(1.006\), so a multiplier of weight 1 barely moves the ranking.
+The shipped eddy file avoids that ambiguity by setting the mode to \code{raw_loss}.
+In \code{loss_multiplier} mode the weight is live.
+
+To prefer the smallest model that reaches a loss target, first finish a classical baseline and read its \code{raw_objective}.
+Then start a new study:
+
+\begin{lstlisting}
+optimize_total_parameters = True
+parameter_objective_mode = "target_error_min_params"
+target_raw_objective = 1.0e-3  # replace with the baseline raw loss
+target_error_constraint_weight = 100.0
+total_params_reference = 100.0
+\end{lstlisting}
+
+Trials above the target are dominated by the excess term.
+Trials at or below the target are ranked by \(N/N_{\mathrm{ref}}\).
+Use a new \code{study_name}.
+The baseline trials were ranked by a different objective, and Optuna's best trial would mix the two scales if they shared a study.
+
+\section{Parallel workers}
+
+\file{run_cores.sh} runs the search as \(N\) processes and then trains the best trial once.
+
+\begin{lstlisting}[style=sh]
+./run_cores.sh 4
+\end{lstlisting}
+
+\(N\) is a positive integer.
+The script creates \file{logs/}, deletes \file{logs/trial_table_rows} so the table header is printed once for this launch, and sets
+\code{OMP_NUM_THREADS}, \code{MKL_NUM_THREADS}, \code{TF_NUM_INTRAOP_THREADS}, and \code{TF_NUM_INTEROP_THREADS} to 1.
+Quantum trials run a compiled JAX circuit.
+One thread per process keeps the workers from oversubscribing the machine.
+The script does not pin JAX's own thread pool beyond those variables; a quantum worker can still use more than one core during compilation.
+
+Each worker is \code{python3 run_pinn.py --search-only --worker-id i}, with standard output and standard error in \file{logs/worker_i.txt}.
+Completed-trial rows are also written to the terminal.
+The workers share the SQLite study.
+The first worker creates the database under a file lock.
+The storage layer waits up to 120 seconds on a locked database.
+Together the workers stop near \code{n_trials} completed trials.
+When the parameter window is set, discarded draws do not count, and the workers keep going until the cap of completed trials is reached.
+
+If any worker exits with an error, the script does not start final training.
+Read \file{logs/worker_*.txt}.
+If every worker succeeds, the script prints \code{Search finished. Training the best completed trial.} and runs \code{python3 run_pinn.py --finalize}.
+
+Do not start a second \code{--finalize}, or a plain \code{python run_pinn.py}, while the workers are still writing the study.
+A plain invocation both searches and then trains.
+Two final training jobs would write the same weight file.
+
+You can split the same work by hand:
+
+\begin{lstlisting}[style=sh]
+python run_pinn.py --search-only --worker-id 0
+python run_pinn.py --search-only --worker-id 1
+python run_pinn.py --finalize
+\end{lstlisting}
+
+Run the two search commands in separate terminals, wait until both have returned, and then finalize.
+\code{--search-only} without \code{--worker-id} is an error.
+
+\section{Continuing, extending, and restarting}
+
+The study is reopened by \code{study_name} inside \code{storage_url}.
+Completed trials already in the file count toward \code{n_trials}.
+
+\begin{itemize}
+\item To add trials, raise \code{n_trials} and run again.
+  Leave the family list and the integer boxes unchanged.
+\item To change \code{model_family_options}, \code{embedding_options}, or the min, max, or step of a parameter that has already been sampled, create a new \code{study_name} and a new \code{storage_url}.
+  Optuna stores the distribution with the study and rejects a conflicting suggestion.
+\item To abandon a smoke-test study, point both names at a new database.
+  You may delete the old \file{analysis/<name>/} folder when you no longer need its weights.
+\item \code{--finalize} never adds trials.
+  It trains the best completed trial under the current objective.
+  If the study has no completed trial, it raises \code{RuntimeError} and names the study.
+\end{itemize}
+
+\section{Which trial is ``best''}
+
+During final training the solver uses Optuna's best trial, the completed trial with the lowest stored objective.
+That objective is \(L\) in \code{raw_loss} mode and the transformed value in the other modes.
+The analysis script, described in the next chapter, selects the completed trial with the lowest \code{raw_objective} user attribute.
+When the mode is \code{raw_loss}, the two selections are the same trial.
+When the mode charges for parameter count, Optuna's best trial and the lowest-residual trial can differ.
+The summary written by \code{--finalize} records Optuna's best trial.
+The analytic report records the lowest residual.
+Read the trial number in each file before you compare them.

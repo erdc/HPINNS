@@ -1,0 +1,159 @@
+\chapter{Outputs and the study report}
+\label{ch:outputs}
+
+\section{Files written by the trainer}
+
+For a database \code{sqlite:///NAME.db} the trainer writes under \file{analysis/NAME/}.
+
+\begin{description}
+\item[\file{NAME.db}]
+The Optuna study, present only when a search ran.
+A fixed-architecture run does not create it.
+SQLite may also leave \file{NAME.db-wal} and \file{NAME.db-shm} while a process has the file open.
+A \file{NAME.db.lock} file serializes creation of a new database.
+
+\item[\file{data/best_hyperparameters.txt}]
+Family, width, depth, learning rate, PDE weights, and, for a quantum family, qubits, layers, and embedding.
+Then the total, classical, and quantum trainable counts.
+If a search ran, the Optuna trial number, its objective, and the stored loss pieces.
+If L-BFGS-B ran, its success flag, message, iteration count, and evaluation count.
+A skipped L-BFGS-B stage is recorded as skipped.
+
+\item[\file{data/best_optuna_model.weights.h5}]
+Keras weights of the final model.
+
+\item[\file{data/best_optuna_model_config.json}]
+The \code{HyperParams} record: width, depth, learning rate, both PDE weights, both log-weights, family, qubits, layers, and embedding.
+
+\item[\file{data/<problem>_losses_data.npz}]
+Adam total, mass, and momentum histories, and the same three series for L-BFGS-B when that stage ran.
+The metadata repeats the family and the L-BFGS status.
+\end{description}
+
+Field archives depend on the benchmark.
+One-dimensional problems write
+
+\begin{itemize}
+\item \file{<problem>_elevation_compare_data.npz} with arrays \code{TIME}, \code{X}, \code{A} (reference), and \code{M} (model);
+\item \file{<problem>_velocity_compare_data.npz} with the same layout for \(u\);
+\item \file{<problem>_error_data.npz} with \code{ETA_ERR} and \code{U_ERR};
+\item \file{<problem>_profiles_boundary_data.npz} with elevation profiles and the velocity at the left endpoint.
+\end{itemize}
+
+The tide archives are converted to dimensional elevation, velocity, kilometers, and hours.
+The dam break and the bump stay in the units of their dataclasses.
+Steady square problems write \file{elevation}, \file{velocity_u}, and \file{velocity_v} compare files, plus \file{<problem>_error_data.npz} with \code{H_ERR}, \code{U_ERR}, and \code{V_ERR}.
+Each archive carries a JSON string \code{meta_json} with the family, the sizes, and the constraint mode.
+
+Load an archive from a short Python session:
+
+\begin{lstlisting}
+import json
+import numpy as np
+
+path = "analysis/optuna_manual_classical_dambreak/data/dam_break_elevation_compare_data.npz"
+with np.load(path, allow_pickle=False) as z:
+    model = z["M"]
+    reference = z["A"]
+    meta = json.loads(str(z["meta_json"]))
+print(meta["model_family"], model.shape)
+print(float(np.max(np.abs(model - reference))))
+\end{lstlisting}
+
+The trainer does not write PDF figures.
+\file{swe_pinn/plots/jcp.py} contains helpers for loss curves and field panels.
+The report script in the next section is the path that turns a finished study into figures.
+
+\section{The study report}
+
+From the repository root, with the database named in \file{user_input.py}:
+
+\begin{lstlisting}[style=sh]
+python analysis/analyze_study.py
+\end{lstlisting}
+
+The script reads that study, writes tables and figures under \file{analysis/<database name>/}, and compares the lowest-residual completed trial with the exact solution.
+Override the locations when the active input file points somewhere else:
+
+\begin{lstlisting}[style=sh]
+python analysis/analyze_study.py \
+    --db optuna_manual_eddies_three_family.db \
+    --study manual_eddies_three_family \
+    --problem steady_eddies
+\end{lstlisting}
+
+\code{--skip-train} writes the tradeoff report and the Optuna figures and skips the field comparison.
+\code{--target} draws an optional horizontal line at that recorded objective in the text report.
+
+\subsection{Text}
+
+\file{data/param_tradeoff.txt} ranks completed trials by the recorded residual and lists family, size, and parameter counts.
+That residual is the validation loss.
+It is not the analytic field error.
+
+\file{data/analytic_comparison.txt} is written when the comparison step runs.
+It names the trial, the family, the architecture, the parameter counts, whether the weights were loaded or trained, the mesh, and for each field the discrete \(L_{2}\) norm of the error, the relative \(L_{2}\) error, and the \(L_{\infty}\) error.
+\file{data/analytic_comparison.npz} stores the fields used for those numbers.
+
+If saved weights match the selected architecture, they are loaded and not trained again.
+If they are missing or were written for a different family or size, the script trains that architecture for \code{final_adam_epochs} on \code{final_adam_nx} by \code{final_adam_nt}, then saves the new weights.
+A fixed-architecture example has no study, so this script has nothing to read until a search has completed at least one trial.
+
+\subsection{Figures}
+
+The script writes the following PDFs in \file{figures/} when the corresponding data exist.
+
+\begin{center}
+\begin{tabular}{@{}lp{8.6cm}@{}}
+\toprule
+File & Contents \\
+\midrule
+\file{optuna_objective_history.pdf} &
+Objective against trial number \\
+\file{optuna_error_vs_parameters.pdf} &
+Residual against trainable-parameter count \\
+\file{optuna_pareto_front.pdf} &
+The nondominated residual-versus-size front \\
+\file{optuna_model_family_comparison.pdf} &
+Families side by side \\
+\file{optuna_qubits_vs_error.pdf} &
+Best residual at each qubit count \\
+\file{optuna_quantum_layers_vs_error.pdf} &
+Best residual at each layer count \\
+\file{optuna_parameter_importance.pdf} &
+fANOVA importance inside each family, one panel per family, each panel normalized on its own \\
+\file{model_vs_analytic.pdf} &
+Model, reference, and error for each field \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Family colors and markers are fixed in the script: classical is a blue circle, hybrid quantum is an orange square, and full quantum is a green triangle.
+A reupload series is drawn separately when a study contains both embeddings.
+A study that fixes \code{reupload}, as the shipped files do, is reported as the reupload series of that family.
+Importance is skipped for a family with too few completed trials for fANOVA, and the script prints that it skipped the panel.
+
+On \file{model_vs_analytic.pdf} each field is a row.
+The columns are the model, the reference, and the signed error.
+The horizontal axis is time for a two-field problem and \(y\) for a three-field problem.
+The vertical axis is \(x\).
+The error panel is annotated with the relative \(L_{2}\) error of that field.
+
+\section{How to read a three-family figure}
+
+On the error-versus-parameters figure, a family that sits lower at the same horizontal position reached a smaller residual at that size.
+The parameter window in Section~\ref{sec:window} is what makes that horizontal comparison possible: draws outside the overlap were discarded, so the plotted points lie in a range every family was allowed to enter.
+Full-quantum points still tend to lie toward the left of that window, because a pure circuit with a handful of qubits is smaller than a width-5, depth-7 perceptron.
+Classical points can occupy the whole window.
+Hybrid points occupy the part of the window that remains after the circuit is added to the trunk.
+
+The Pareto figure is the set of completed trials that are not worse in both residual and size than some other completed trial.
+A family can be absent from that front.
+That is a result about the study you ran, at the epoch budget you set.
+A 50-epoch smoke test does not support the same reading as a 4000-epoch study.
+
+The analytic page is one model, the lowest residual in the study, retrained or reloaded at the final-stage budget.
+Quote the trial number and the family from \file{analytic_comparison.txt} together with the relative \(L_{2}\) numbers.
+The Optuna objective of that trial is a residual on the score lattice.
+The relative \(L_{2}\) number is a field error on the evaluation mesh.
+They answer different questions.

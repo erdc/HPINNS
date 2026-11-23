@@ -1,0 +1,76 @@
+\contentsline {chapter}{\numberline {1}Introduction}{3}{chapter.1}%
+\contentsline {section}{\numberline {1.1}What one run does}{3}{section.1.1}%
+\contentsline {section}{\numberline {1.2}The three families}{4}{section.1.2}%
+\contentsline {section}{\numberline {1.3}What this manual assumes}{4}{section.1.3}%
+\contentsline {chapter}{\numberline {2}Installation and layout}{5}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Requirements}{5}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Check that the package imports}{6}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Repository layout}{6}{section.2.3}%
+\contentsline {section}{\numberline {2.4}First command}{6}{section.2.4}%
+\contentsline {chapter}{\numberline {3}The three model families}{8}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Classical}{8}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Hybrid quantum}{8}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Classical warmup}{9}{subsection.3.2.1}%
+\contentsline {section}{\numberline {3.3}Full quantum}{9}{section.3.3}%
+\contentsline {section}{\numberline {3.4}The circuit}{10}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Parameter counts you can check}{10}{section.3.5}%
+\contentsline {section}{\numberline {3.6}What each family is for}{11}{section.3.6}%
+\contentsline {chapter}{\numberline {4}Training, constraints, and the loss}{12}{chapter.4}%
+\contentsline {section}{\numberline {4.1}The scalar loss}{12}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Hard and soft constraints}{12}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Collocation}{13}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Adam}{13}{section.4.4}%
+\contentsline {section}{\numberline {4.5}L-BFGS-B}{13}{section.4.5}%
+\contentsline {section}{\numberline {4.6}How a trial is scored}{14}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Reading the trial table}{14}{section.4.7}%
+\contentsline {chapter}{\numberline {5}Built-in benchmarks}{15}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Linear tidal test}{15}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Wet-bed dam break}{16}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Transcritical bump}{16}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Steady solid-body rotation}{17}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Steady vortex}{17}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Steady eddy lattice}{17}{section.5.6}%
+\contentsline {section}{\numberline {5.7}Choosing a constraint mode}{18}{section.5.7}%
+\contentsline {section}{\numberline {5.8}Adding a benchmark}{18}{section.5.8}%
+\contentsline {chapter}{\numberline {6}The input file}{19}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Run identity}{19}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Fixed architecture}{20}{section.6.2}%
+\contentsline {section}{\numberline {6.3}What a search is allowed to sample}{20}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Family-specific ranges}{21}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Parameter window}{21}{section.6.5}%
+\contentsline {section}{\numberline {6.6}Search budget and sampler}{21}{section.6.6}%
+\contentsline {section}{\numberline {6.7}Final stage}{22}{section.6.7}%
+\contentsline {section}{\numberline {6.8}Objective fields}{22}{section.6.8}%
+\contentsline {section}{\numberline {6.9}Presets}{22}{section.6.9}%
+\contentsline {chapter}{\numberline {7}Examples for each family}{24}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Classical dam break}{24}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Hybrid-quantum tide}{25}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Full-quantum vortex}{26}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Same problem, three fixed models}{27}{section.7.4}%
+\contentsline {section}{\numberline {7.5}What the config file records}{28}{section.7.5}%
+\contentsline {chapter}{\numberline {8}Searching across families}{30}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Three families, one study}{30}{section.8.1}%
+\contentsline {section}{\numberline {8.2}One family, circuit size only}{32}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Classical width and depth}{33}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Learning rate and loss weights}{33}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Parameter-aware objectives}{34}{section.8.5}%
+\contentsline {section}{\numberline {8.6}Parallel workers}{34}{section.8.6}%
+\contentsline {section}{\numberline {8.7}Continuing, extending, and restarting}{35}{section.8.7}%
+\contentsline {section}{\numberline {8.8}Which trial is ``best''}{35}{section.8.8}%
+\contentsline {chapter}{\numberline {9}Outputs and the study report}{36}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Files written by the trainer}{36}{section.9.1}%
+\contentsline {section}{\numberline {9.2}The study report}{37}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Text}{37}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Figures}{38}{subsection.9.2.2}%
+\contentsline {section}{\numberline {9.3}How to read a three-family figure}{38}{section.9.3}%
+\contentsline {chapter}{\numberline {10}Troubleshooting}{39}{chapter.10}%
+\contentsline {section}{\numberline {10.1}The family or the counts look wrong}{39}{section.10.1}%
+\contentsline {section}{\numberline {10.2}Optuna rejects the study}{39}{section.10.2}%
+\contentsline {section}{\numberline {10.3}The search finishes without training the model you expected}{39}{section.10.3}%
+\contentsline {section}{\numberline {10.4}Every quantum trial is discarded}{40}{section.10.4}%
+\contentsline {section}{\numberline {10.5}The loss columns}{40}{section.10.5}%
+\contentsline {section}{\numberline {10.6}Adam prints nothing}{40}{section.10.6}%
+\contentsline {section}{\numberline {10.7}Workers fail together}{40}{section.10.7}%
+\contentsline {section}{\numberline {10.8}The analytic comparison retrains}{41}{section.10.8}%
+\contentsline {section}{\numberline {10.9}Full quantum is slow, and warmup did nothing}{41}{section.10.9}%
+\contentsline {section}{\numberline {10.10}Checklist before a long study}{41}{section.10.10}%

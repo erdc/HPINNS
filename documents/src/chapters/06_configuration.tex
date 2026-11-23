@@ -1,0 +1,251 @@
+\chapter{The input file}
+\label{ch:config}
+
+The solver imports \file{user_input.py} and reads the object \code{USER_PINN_INPUTS}.
+A name listed in \code{tune_variables} is sampled by Optuna on each trial, inside the matching range.
+Every other setting stays at its \code{*_value} field.
+\code{model_family} is the exception among the categorical settings: when it is tuned, Optuna draws from \code{model_family_options}.
+\code{embedding} is drawn from \code{embedding_options}, and only after the trial is still \code{hybrid_quantum} or \code{full_quantum}.
+
+If \code{use_optuna} is false, if \code{tune_variables} is empty, or if \code{n_trials} is 0, no study is created and the fixed values are trained directly.
+Artifacts still go to the folder named by \code{storage_url}.
+
+\section{Run identity}
+
+\begin{description}
+\item[\code{problem_name}]
+One of the six names in Table~\ref{tab:problems}.
+
+\item[\code{constraints}]
+\code{hard} or \code{soft}. See Section~\ref{sec:constraints}.
+
+\item[\code{model_family}]
+The family used when \code{"model_family"} is not in \code{tune_variables}.
+
+\item[\code{model_family_options}]
+The families a tuned study may draw.
+Remove a name to keep that family out of the search.
+An existing study freezes this set.
+Change \code{study_name} before adding or removing a family, or Optuna rejects the new categorical distribution.
+
+\item[\code{storage_url}]
+SQLite URL of the study.
+A relative file is stored in \file{analysis/<database name>/}.
+A new URL starts a new database.
+Trials are appended when the file already exists.
+
+\item[\code{study_name}]
+Name of the study inside that database.
+Reloading the same name continues the same search, including its frozen distributions.
+Use a new name when the family list, the embedding list, or an integer search range changes.
+
+\item[\code{use_optuna}]
+Master switch for the search.
+\end{description}
+
+\section{Fixed architecture}
+
+These fields are used when the corresponding name is absent from \code{tune_variables}.
+They are also the values a search falls back to for any name it is not allowed to sample.
+
+\begin{description}
+\item[\code{width_value}, \code{depth_value}]
+Hidden width and hidden depth of each classical tower.
+Ignored for \code{full_quantum}.
+The dam-break reference search preferred a width near 22.
+
+\item[\code{lr_value}]
+Adam learning rate for every family.
+The shipped studies leave \code{"lr"} out of \code{tune_variables}, so this value is the rate.
+Adding \code{"lr"} to the list samples it for every family, log-uniform between \code{lr_min} and \code{lr_max}.
+
+\item[\code{log_w_mass_value}, \code{log_w_mom_value}]
+The logarithms in Equation~\eqref{eq:weights}.
+Zeros give PDE weights \((1,1)\).
+
+\item[\code{n_qubits_value}, \code{q_layers_value}]
+Circuit size for a fixed hybrid or full-quantum model.
+A hybrid zero is stored as classical.
+A full-quantum value below 1 aborts the run.
+
+\item[\code{embedding_value}]
+\code{once} or \code{reupload}.
+Classical trials ignore it.
+The shipped file sets \code{reupload}.
+
+\item[\code{embedding_options}]
+Layouts a search may draw when \code{"embedding"} is tuned.
+The shipped tuple contains only \code{reupload}.
+This set is frozen with the study in the same way as \code{model_family_options}.
+\end{description}
+
+\section{What a search is allowed to sample}
+
+\code{tune_variables} accepts these names and no others:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Name & Distribution when it is listed \\
+\midrule
+\code{model_family} & categorical over \code{model_family_options} \\
+\code{width} & integers from the width box, stride \code{width_step} \\
+\code{depth} & integers from the depth box, stride 1 \\
+\code{lr} & log-uniform between \code{lr_min} and \code{lr_max} \\
+\code{log_w_mass}, \code{log_w_mom} & uniform on the matching min/max \\
+\code{n_qubits}, \code{q_layers} & integers on the matching min/max \\
+\code{embedding} & categorical over \code{embedding_options} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Sampling is conditional on the family drawn for that trial.
+
+\begin{center}
+\begin{tabular}{@{}p{3.3cm}p{5.4cm}p{5.4cm}@{}}
+\toprule
+Family & Sampled when listed & Left at the fixed value \\
+\midrule
+\code{classical} &
+width, depth, learning rate, log-weights &
+qubits, layers, embedding \\
+\code{hybrid_quantum} &
+those, plus qubits, layers, and embedding &
+--- \\
+\code{full_quantum} &
+learning rate, log-weights, qubits, layers, embedding &
+width and depth, which are stored as 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A hybrid draw with zero qubits is rewritten as classical and then follows the classical rules.
+With \code{n_qubits_min} at 1 or more, that rewrite does not occur.
+
+\section{Family-specific ranges}
+
+When \code{use_family_specific_search_ranges} is true, a classical trial uses \code{classical_width_*} and \code{classical_depth_*}, and a hybrid trial uses the \code{hybrid_*} bounds.
+Full quantum does not sample width or depth in either case.
+When the flag is false, both families share \code{width_min}, \code{width_max}, \code{width_step}, \code{depth_min}, and \code{depth_max}.
+
+The shipped eddy study sets the two boxes to the same trunk, width 1 through 5 and depth 2 through 7.
+The comparison is then the residual circuit, rather than a different range of perceptrons.
+A hybrid whose circuit pushes the total over \code{total_params_max} is discarded.
+
+Inclusive bounds and the width stride are the Optuna suggestions
+\[
+w = w_{\min},\; w_{\min}+w_{\mathrm{step}},\; \ldots,\; w_{\max}.
+\]
+Depth is every integer from the minimum through the maximum.
+The learning-rate floor in the shipped file is \(10^{-4}\).
+A draw near \(2\times 10^{-5}\) stayed on the soft-loss plateau for a whole trial in the reference dam-break setup.
+The shipped log-weight box is \([-1,1]\) for each equation.
+
+\section{Parameter window}
+\label{sec:window}
+
+\code{total_params_min} and \code{total_params_max} discard a draw before training.
+Either bound may be \code{None}, which turns that side off.
+A positive bound is inclusive in the sense that a count strictly below the minimum, or strictly above the maximum, is pruned.
+
+The shipped eddy window is 42 to 603 parameters.
+Forty-two is the smallest three-tower hybrid in the search box (width 1, depth 2, one qubit, one layer).
+Six hundred three is the largest three-tower classical model in that box (width 5, depth 7).
+The overlap is the range of sizes that all three families can occupy, so a family is not rewarded only for being smaller or only for being larger.
+Recompute the window when you change the number of fields or the width and depth boxes.
+Table~\ref{tab:counts} is the arithmetic.
+A two-field problem with the same width and depth boxes has a different total, and the eddy numbers 42 and 603 do not transfer to it.
+
+Discarded draws do not count toward \code{n_trials}.
+When either bound is set, the search keeps drawing until \code{n_trials} trials have completed inside the window.
+When both bounds are unset, a single process stops after \code{n_trials} attempts, and a failed attempt consumes one of them.
+
+\section{Search budget and sampler}
+
+\begin{description}
+\item[\code{n_trials}]
+Completed-trial cap.
+One \code{python run_pinn.py} stops at this many new completed trials, counting trials already stored in the study.
+\file{run_cores.sh} shares the same cap across workers.
+
+\item[\code{optuna_n_startup_trials}]
+Random trials before the TPE sampler starts concentrating.
+The sampler is Optuna's \code{TPESampler} with \code{multivariate=True} and \code{group=True}, which is the setting used for conditional parameters such as qubits and layers.
+The seed is 42 in a single process and \(42+N\) for worker \(N\).
+The shipped value is 2000, above the completed cap of 500, so the whole search stays in the random phase.
+Each draw then picks a family with equal probability, and the three finished counts stay close.
+Lower the startup count below \code{n_trials} when you want TPE to exploit the trials it has already seen.
+
+\item[\code{trial_epochs}, \code{trial_nx}, \code{trial_nt}]
+Adam budget and training lattice inside a trial.
+
+\item[\code{score_nx}, \code{score_nt}]
+Lattice for the objective. The shipped choice is twice the trial lattice on each axis.
+\end{description}
+
+\section{Final stage}
+
+\begin{description}
+\item[\code{final_adam_epochs}, \code{final_adam_nx}, \code{final_adam_nt}]
+Budget and lattice for the model that is kept.
+This run starts from the same seed-42 initialization as a trial.
+It does not resume the trial weights.
+
+\item[\code{show_epoch_output}, \code{epoch_output_every}]
+Final-stage table.
+
+\item[\code{show_trial_epoch_output}, \code{trial_epoch_output_every}]
+Per-trial table.
+The shipped file prints every trial epoch, which is a large log.
+Raise the stride, or set the flag false, when the log files dominate the disk.
+
+\item[\code{use_lbfgs} and the \code{final_lbfgs_*} fields]
+Section on L-BFGS-B in Chapter~\ref{ch:training}.
+
+\item[\code{nx}, \code{nt}]
+Evaluation mesh for the archives. Not a training grid.
+\end{description}
+
+\section{Objective fields}
+
+\code{optimize_total_parameters}, \code{parameter_objective_mode}, \code{target_raw_objective}, \code{target_error_constraint_weight}, \code{total_params_objective_weight}, and \code{total_params_reference} are defined in Section~\ref{sec:objective}.
+The shipped eddy file minimizes the raw validation loss and still records parameter counts.
+\code{total_params_reference} must be positive.
+It is the parameter count that counts as one in the two parameter-aware formulas.
+The shipped reference is \(10^{5}\).
+
+\section{Presets}
+
+These files are complete copies of the input file.
+Copy one over \file{user_input.py} from the repository root.
+That replaces the active file, so keep a copy of any local edits first.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+File & Benchmark & Families in the search \\
+\midrule
+\file{user_input.py} & eddy lattice, hard & classical, hybrid, full \\
+\file{user_input.py.tide} & tide, hard & classical, hybrid, full \\
+\file{user_input.py.tide_2fam} & tide, hard & classical, hybrid \\
+\file{user_input.py.tide_3fam} & tide, hard, reupload & classical, hybrid, full \\
+\file{user_input.py.damBreak} & dam break, soft & classical, hybrid, full \\
+\file{user_input.py.dam_break_3fam} & dam break, soft, reupload & classical, hybrid, full \\
+\file{user_input.py.bump} & bump, soft & classical, hybrid, full \\
+\file{user_input.py.steady_rotation_2fam} & rotation, soft & classical, hybrid \\
+\file{user_input.py.steady_rotation_3fam} & rotation, soft & classical, hybrid, full \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[style=sh]
+cp user_input.py user_input.py.local-backup
+cp user_input.py.tide_3fam user_input.py
+python run_pinn.py
+\end{lstlisting}
+
+Each preset names its own database and study.
+Loading a preset and then editing \code{model_family_options} without changing \code{study_name} will collide with trials already stored under that name.
+Chapter~\ref{ch:examples} uses fresh database names for that reason.
+The presets themselves are the production studies, with hundreds of trials and thousands of epochs.
+Read \code{n_trials} and \code{final_adam_epochs} in the file you copied before you launch it.
