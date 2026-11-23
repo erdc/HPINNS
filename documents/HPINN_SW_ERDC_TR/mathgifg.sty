@@ -1,0 +1,18 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{mathgifg}[2026/10/27 local fallback]
+% The ERDC class loads mathgifg for Microsoft Georgia and ITC Franklin
+% Gothic. Those commercial font files are not installed here. This
+% fallback satisfies the class and maps Franklin Gothic Book (series k)
+% onto the current sans family so the cover and title pages still build.
+\newcommand{\mathgifg@subseries}[1]{%
+  \DeclareFontShape{OT1}{#1}{k}{n}{<->ssub*#1/m/n}{}%
+  \DeclareFontShape{OT1}{#1}{k}{it}{<->ssub*#1/m/sl}{}%
+  \DeclareFontShape{OT1}{#1}{k}{sl}{<->ssub*#1/m/sl}{}%
+  \DeclareFontShape{OT1}{#1}{h}{n}{<->ssub*#1/bx/n}{}%
+  \DeclareFontShape{T1}{#1}{k}{n}{<->ssub*#1/m/n}{}%
+  \DeclareFontShape{T1}{#1}{k}{it}{<->ssub*#1/m/sl}{}%
+  \DeclareFontShape{T1}{#1}{k}{sl}{<->ssub*#1/m/sl}{}%
+  \DeclareFontShape{T1}{#1}{h}{n}{<->ssub*#1/bx/n}{}%
+}
+\mathgifg@subseries{cmss}
+\mathgifg@subseries{cmr}

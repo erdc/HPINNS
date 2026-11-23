@@ -1,0 +1,18 @@
+Analytic comparison of the best completed trial
+problem: dam_break
+trial: 78
+recorded objective: 1.281117e-01
+family: hybrid_quantum
+width: 5
+depth: 4
+n_qubits: 4
+q_layers: 2
+embedding: reupload
+lr: 1.000000e-03
+parameters: total=368, classical=320, quantum=48
+weights: trained from the best trial with a fresh initialization
+mesh: 201 by 201
+
+field                L2    relative L2           Linf
+h          2.673909e+00   3.434297e-02   1.309631e-01
+u          1.411394e+01   1.783735e-01   6.187024e-01

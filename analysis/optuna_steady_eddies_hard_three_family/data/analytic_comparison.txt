@@ -1,0 +1,19 @@
+Analytic comparison of the best completed trial
+problem: steady_eddies
+trial: 134
+recorded objective: 4.012260e+00
+family: hybrid_quantum
+width: 5
+depth: 2
+n_qubits: 5
+q_layers: 5
+embedding: reupload
+lr: 1.000000e-03
+parameters: total=558, classical=333, quantum=225
+weights: loaded weights best_optuna_model.weights.h5
+mesh: 201 by 201
+
+field                L2    relative L2           Linf
+h          1.036050e+00   6.434143e-03   2.209267e-02
+u          2.354518e+01   6.166569e-01   4.768416e-01
+v          2.695128e+01   7.058638e-01   4.105251e-01

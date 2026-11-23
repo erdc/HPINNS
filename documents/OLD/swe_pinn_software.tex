@@ -1,0 +1,562 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{microtype}
+
+\title{SWE PINN software description}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note describes the shallow-water physics-informed neural network (PINN) package in this directory.
+The package trains a two-field network for water depth and velocity, optionally searches its architecture and learning rate with Optuna, and compares the trained field with an exact solution when the selected test case provides one.
+Three model families share one trainer: a classical pair of multilayer perceptrons, the same pair with a residual quantum circuit, and a pure quantum readout.
+Three built-in test cases share one problem interface: a linear tidal oscillation, a wet-bed dam break, and steady transcritical flow over a bump.
+A new test case is added by supplying that interface, not by editing the trainer.
+\end{abstract}
+
+\section{What the software does}
+
+The entry point is \texttt{run\_pinn.py}, which calls \texttt{swe\_pinn.cli.main} and then \texttt{swe\_pinn.core.solver.run\_solver}.
+One run does the following.
+
+\begin{enumerate}[leftmargin=1.4em]
+\item Read \texttt{USER\_PINN\_INPUTS} from \texttt{user\_input.py}.
+\item Build the test case named by \texttt{problem\_name}.
+\item If Optuna is enabled, sample a trial, train it with Adam, score it, and repeat until the completed-trial cap is reached.
+\item Rebuild the best completed trial, or the fixed hyperparameters if the search was skipped, and train that model again with Adam.
+\item Optionally continue with L-BFGS-B.
+\item Write weights, a hyperparameter summary, loss histories, and comparison figures.
+\end{enumerate}
+
+Two command-line modes split that sequence for parallel search.
+
+\begin{itemize}[leftmargin=1.4em]
+\item \texttt{python run\_pinn.py --search-only --worker-id N} runs trials only.
+  The sampler seed is \(42+N\).
+  The process does not train the final model.
+\item \texttt{python run\_pinn.py --finalize} loads the best completed trial already stored in the study and runs the final training and figure stage.
+  It adds no trials.
+\end{itemize}
+
+\texttt{run\_12cores.sh} starts twelve \texttt{--search-only} processes that share one SQLite study, waits for them, and then runs \texttt{--finalize}.
+Each worker's epoch log is redirected to \texttt{logs/worker\_N.txt}.
+The script sets \texttt{OMP\_NUM\_THREADS}, \texttt{MKL\_NUM\_THREADS}, \texttt{TF\_NUM\_INTRAOP\_THREADS}, and \texttt{TF\_NUM\_INTEROP\_THREADS} to 1.
+The JAX circuit used by the quantum families does not stay inside that limit.
+
+All trainable tensors and PDE derivatives use 64-bit floating point.
+\texttt{swe\_pinn/physics/quantum.py} sets \texttt{jax\_enable\_x64} before any circuit is built.
+
+\section{Repository layout}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Path & Role \\
+\midrule
+\texttt{user\_input.py} & Run settings and the physical parameters of each test case \\
+\texttt{run\_pinn.py} & Process entry point \\
+\texttt{run\_12cores.sh} & Twelve search workers, then one final training \\
+\texttt{swe\_pinn/cli.py} & Argument parser \\
+\texttt{swe\_pinn/core/solver.py} & Loss, Adam, L-BFGS-B, Optuna, artifacts \\
+\texttt{swe\_pinn/physics/common.py} & Network, problem dataclass, collocation grids \\
+\texttt{swe\_pinn/physics/quantum.py} & PennyLane circuit and TensorFlow bridge \\
+\texttt{swe\_pinn/problems/} & Test-case builders and the registry \\
+\texttt{swe\_pinn/plots/jcp.py} & Final figures \\
+\texttt{analyze\_param\_tradeoff.py} & Numeric readout of a finished or running study \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Python packages}
+
+The trainer imports the following third-party packages.
+The standard library supplies \texttt{argparse}, \texttt{dataclasses}, \texttt{json}, \texttt{os}, \texttt{sqlite3} through Optuna's storage, and \texttt{time}.
+
+\begin{center}
+\begin{tabular}{@{}llp{7.2cm}@{}}
+\toprule
+Package & Used by & Role \\
+\midrule
+NumPy & trainer, problems, analysis &
+Collocation coordinates, exact-solution arrays, packed L-BFGS vectors, saved archives \\
+TensorFlow / Keras & trainer and network &
+Dense layers, Adam, \texttt{GradientTape} derivatives, 64-bit variables \\
+Optuna & trainer &
+Study, TPE sampler, SQLite storage, completed-trial cap \\
+SciPy & trainer and dam-break, bump &
+L-BFGS-B; root finding for the dam-break and bump exact solutions \\
+PennyLane & quantum layer &
+Circuit definition and \texttt{default.qubit} statevector device \\
+JAX & quantum layer &
+Just-in-time batched circuit and vector-Jacobian product \\
+Matplotlib & final plots and analysis scripts &
+Loss curves, field comparisons, Optuna figures \\
+pandas & analysis scripts only &
+Trial tables. The trainer does not import it \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+PennyLane is imported only when a circuit is constructed.
+A classical-only run does not need it.
+A hybrid or pure-quantum run needs PennyLane and JAX, because the circuit is compiled with the JAX interface and differentiated with \texttt{diff\_method="backprop"}.
+The README install line is
+\begin{quote}
+\texttt{pip install tensorflow optuna scipy matplotlib pennylane}
+\end{quote}
+JAX must be present as well for either quantum family.
+The analysis scripts additionally need pandas.
+
+\section{Configuration}
+
+\texttt{user\_input.py} instantiates four dataclasses at import time:
+
+\begin{itemize}[leftmargin=1.4em]
+\item \texttt{USER\_PINN\_INPUTS}, the only object the solver reads for training and search settings;
+\item \texttt{TIDAL\_TEST\_PARAMETERS};
+\item \texttt{DAM\_BREAK\_PARAMETERS};
+\item \texttt{TRANSCRITICAL\_BUMP\_PARAMETERS}.
+\end{itemize}
+
+\texttt{problem\_name} selects which physical dataclass is passed to the matching builder.
+The solver never mixes parameters across test cases.
+
+A name listed in \texttt{tune\_variables} is sampled by Optuna.
+Every other sampled quantity stays at its \texttt{*\_value} field.
+Supported names are \texttt{model\_family}, \texttt{width}, \texttt{depth}, \texttt{lr}, \texttt{log\_w\_mass}, \texttt{log\_w\_mom}, \texttt{n\_qubits}, and \texttt{q\_layers}.
+\texttt{model\_family} is drawn from \texttt{model\_family\_options}.
+The numeric names use the matching \texttt{*\_min}, \texttt{*\_max}, and, for width, \texttt{*\_step}.
+Learning rate is log-uniform.
+The two log-weights are uniform.
+Width and depth are integer.
+Qubit count and circuit depth are integer.
+
+If \texttt{use\_optuna} is false, \texttt{tune\_variables} is empty, or \texttt{n\_trials} is 0, the search is skipped and the fixed values are trained directly.
+
+\texttt{constraints} is either \texttt{soft} or \texttt{hard}.
+Soft mode leaves the network output unconstrained and adds a penalty.
+Hard mode builds the output so the initial and boundary data are satisfied by construction, and the penalty is omitted.
+A problem that has no soft-penalty function cannot be run with \texttt{constraints="soft"}.
+
+\section{Model families}
+\label{sec:families}
+
+The network class is \texttt{PINN} in \texttt{swe\_pinn/physics/common.py}.
+It always returns two scalars, concatenated as a row \((h,u)\) or \((\eta,u)\), depending on the test case.
+Depth and velocity each have their own tower.
+There is no shared trunk.
+Hidden dense layers use \(\tanh\) and Glorot normal initialization with zero biases.
+Output dense layers are linear.
+The legal family names are \texttt{classical}, \texttt{hybrid\_quantum}, and \texttt{full\_quantum}.
+
+\subsection{Classical}
+
+Each tower is a stack of \texttt{depth} hidden layers of width \texttt{width}, followed by a linear unit.
+The circuit is absent.
+For one tower with input dimension 2 and \(\texttt{depth}\ge 1\), the trainable count is
+\begin{equation}
+3w + (d-1)(w^{2}+w) + (w+1),
+\end{equation}
+where \(w\) is the width and \(d\) is the depth.
+The first term is the map from \((x,t)\) into the first hidden layer.
+The model count is twice that, because the towers are separate.
+
+\subsection{Hybrid quantum}
+
+The classical towers are unchanged.
+After the last hidden layer of each tower the code adds
+\begin{equation}
+z \leftarrow z + \alpha\,\mathrm{decode}\big(\mathrm{circuit}(\mathrm{encode}(z))\big).
+\end{equation}
+\(\mathrm{encode}\) is a \(\tanh\) dense map from width \(w\) onto \texttt{n\_qubits} features.
+\(\mathrm{decode}\) is a \(\tanh\) dense map from the Pauli-\(Z\) expectations back to width \(w\).
+The scalar gate \(\alpha\) is a trainable weight initialized to 0, so the first step is exactly the classical tower.
+Each tower has its own encoder, circuit, decoder, and \(\alpha\).
+A hybrid trial with \texttt{n\_qubits} equal to 0 is rewritten as classical and the circuit is not built.
+
+If \texttt{hybrid\_classical\_warmup\_fraction} is positive, the first that fraction of Adam epochs sets \texttt{quantum\_enabled} to false.
+The forward pass then skips the circuit.
+The quantum variables still exist.
+Their gradients are replaced by zeros so that Adam's variable list does not change when the circuit is switched on.
+The fraction applies only to \texttt{hybrid\_quantum}.
+A value of 0 keeps the circuit on from epoch 1.
+The fraction is used both inside a trial and in the final Adam run.
+
+\subsection{Full quantum}
+
+There is no hidden multilayer perceptron and no residual gate.
+Each tower is
+\begin{equation}
+\mathrm{readout}\big(\mathrm{circuit}(\mathrm{encode}(x,t))\big).
+\end{equation}
+\(\mathrm{encode}\) is one \(\tanh\) dense map from the two inputs onto \texttt{n\_qubits} angles.
+\(\mathrm{readout}\) is a linear dense map from the Pauli-\(Z\) expectations to one scalar.
+\texttt{width} and \texttt{depth} are stored as 0 and are not sampled.
+Both \texttt{n\_qubits} and \texttt{q\_layers} must be at least 1.
+There is no classical warmup, because there is no classical trunk to train first.
+
+The parameters that the code labels classical on a full-quantum model are the encoder and the readout, not a hidden trunk.
+Per tower those are \(3n_{q}\) encoder weights and \(n_{q}+1\) readout weights.
+Two towers give
+\begin{equation}
+8n_{q}+2
+\end{equation}
+such parameters.
+The circuit angles are counted separately.
+
+\subsection{Circuit}
+
+\texttt{QuantumLayer} holds a tensor \(\theta\) of shape \((\texttt{q\_layers},\,\texttt{n\_qubits},\,3)\), initialized from a normal distribution of standard deviation \(0.1\).
+That is \(3\,n_{q}\,n_{L}\) angles per tower and \(6\,n_{q}\,n_{L}\) angles for the pair of towers.
+
+The circuit, compiled once per layer by \texttt{jax.jit}, is:
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \texttt{AngleEmbedding} of the incoming features with \(Y\) rotations, one feature per qubit;
+\item for each variational layer, a PennyLane \texttt{Rot} gate on every qubit, using the three angles stored for that qubit, then a ring of \texttt{CNOT} gates, including the wrap from the last qubit to the first when more than one qubit is present;
+\item the expectation value of Pauli \(Z\) on every qubit.
+\end{enumerate}
+
+The device is PennyLane \texttt{default.qubit}.
+The batch axis is applied with \texttt{jax.vmap} outside the qnode, and the expectations are stacked outside the qnode.
+TensorFlow still owns \(\theta\) and the PDE tape.
+A \texttt{tf.custom\_gradient} runs the compiled circuit and returns the JAX vector-Jacobian product.
+The call passes \texttt{tf.identity(theta)} so the custom gradient receives a tensor rather than the Keras variable itself.
+The compiled function is rebuilt for each \texttt{QuantumLayer} instance.
+A new \((n_{q},n_{L})\) pair, and a new process, each pay that compilation.
+
+\subsection{What Optuna samples for each family}
+
+Family is chosen first.
+Later suggestions are conditional.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Family & Sampled when listed & Not sampled \\
+\midrule
+classical & width, depth, learning rate, log-weights & qubits, layers \\
+hybrid quantum & those, plus qubits and layers & --- \\
+full quantum & learning rate, log-weights, qubits, layers & width, depth \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+If \texttt{use\_family\_specific\_search\_ranges} is true, a classical trial reads \texttt{classical\_width\_*} and \texttt{classical\_depth\_*}, and a hybrid trial reads the \texttt{hybrid\_*} bounds.
+Those two boxes can be set equal, so the comparison is the residual circuit rather than a different trunk range.
+Full quantum ignores both boxes.
+An existing study freezes categorical choices and integer distributions.
+Changing \texttt{model\_family\_options}, or a qubit or layer bound, on a study that already has trials requires a new \texttt{study\_name}.
+
+\section{Collocation}
+
+Interior points are a fixed tensor product, built by \texttt{sample\_interior\_grid(domain, nx, nt)}.
+The caller gives the number of space stations and the number of time stations.
+Both axes are \texttt{linspace} over the problem domain, including both endpoints, so the number of points is \(n_{x}n_{t}\).
+Points are not redrawn between epochs.
+The flatten order is all times at the first \(x\), then all times at the next \(x\).
+
+A trial trains on \texttt{trial\_nx} by \texttt{trial\_nt}.
+Every family uses that lattice.
+The Optuna objective is evaluated on \texttt{score\_nx} by \texttt{score\_nt}.
+The final Adam run uses \texttt{final\_adam\_nx} by \texttt{final\_adam\_nt}.
+L-BFGS-B, when enabled, uses \texttt{final\_lbfgs\_nx} by \texttt{final\_lbfgs\_nt}.
+The figure mesh, \texttt{nx} by \texttt{nt}, is a separate evaluation grid.
+
+\section{Objective}
+\label{sec:objective}
+
+One loss is used for Adam, for L-BFGS-B, and for the Optuna score.
+\texttt{compute\_losses} evaluates the problem residual at the collocation points and, in soft mode, adds the problem's penalty.
+
+Let \(r_{m}\) and \(r_{p}\) be the two residual components returned by the test case.
+They are called mass and momentum in the logs even when the test case is the linear tidal system.
+The PDE pieces are mean squares,
+\begin{equation}
+L_{m}=\operatorname{mean}(r_{m}^{2}),\qquad
+L_{p}=\operatorname{mean}(r_{p}^{2}).
+\end{equation}
+The weights come from the log-parameters by
+\begin{equation}
+(w_{m},w_{p})
+=
+\frac{\big(e^{\lambda_{m}},\,e^{\lambda_{p}}\big)}
+{\operatorname{mean}\big(e^{\lambda_{m}},\,e^{\lambda_{p}}\big)}.
+\end{equation}
+Equal logs therefore give weights \((1,1)\).
+These weights do not multiply the soft penalty.
+The penalty has its own coefficients on the physical dataclass.
+The scalar loss is
+\begin{equation}
+L = w_{m} L_{m} + w_{p} L_{p} + L_{\mathrm{soft}}.
+\end{equation}
+In hard mode, \(L_{\mathrm{soft}}=0\).
+The logged IC and BC columns are the pieces the test case chooses to report inside \(L_{\mathrm{soft}}\).
+They are already included in \(L\).
+They are not added a second time.
+
+Derivatives are TensorFlow automatic derivatives of the network outputs, taken with \texttt{GradientTape} inside the test case.
+The loss is the mean square of those pointwise residuals.
+There is no test function and no integration by parts.
+The same strong-form residual is used on the training grid and on the score grid.
+
+\subsection{Trial score}
+
+Adam trains on the \texttt{trial\_nx} by \texttt{trial\_nt} lattice for \texttt{trial\_epochs} epochs.
+After that, the trial is ranked on the same loss evaluated on the \texttt{score\_nx} by \texttt{score\_nt} lattice.
+The point count \(n_{x}n_{t}\) of that lattice is stored as the trial attribute \texttt{score\_n\_f}, and the two station counts are stored as \texttt{score\_nx} and \texttt{score\_nt}.
+This second evaluation does not take another Adam step.
+The value passed to Optuna is that scalar, possibly transformed by the parameter mode below.
+The attribute \texttt{raw\_objective} is the untransformed loss, including the soft penalty.
+Also stored are the mass, momentum, constraint, IC, and BC pieces, the family, the qubit and layer counts, and the parameter counts.
+
+The score is a residual.
+It is not an \(L^{2}\) error against the exact depth or velocity.
+Those field comparisons are computed only after the final model is trained, on the \texttt{nx} by \texttt{nt} figure mesh.
+
+\subsection{Parameter term}
+
+\texttt{parameter\_objective\_mode} decides whether the parameter count changes the number Optuna minimizes.
+Counts are stored in every mode.
+
+\begin{itemize}[leftmargin=1.4em]
+\item \texttt{raw\_loss}: the objective is \(L\).
+\item \texttt{loss\_multiplier}: the objective is \(L\,(1+\alpha\,N/N_{\mathrm{ref}})\), where \(N\) is the trainable-parameter count, \(\alpha\) is \texttt{total\_params\_objective\_weight}, and \(N_{\mathrm{ref}}\) is \texttt{total\_params\_reference}.
+  A weight of 0 returns \(L\).
+\item \texttt{target\_error\_min\_params}: the objective is \(N/N_{\mathrm{ref}}\) plus \texttt{target\_error\_constraint\_weight} times the relative amount by which \(L\) exceeds \texttt{target\_raw\_objective}.
+  The excess is zero once \(L\) is at or below the target.
+  This mode requires a positive target.
+\end{itemize}
+
+If \texttt{optimize\_total\_parameters} is false, every mode returns \(L\).
+
+\subsection{What is counted as a parameter}
+
+The total is the sum of the sizes of \texttt{model.trainable\_variables}.
+The quantum count is the trainable variables on \texttt{quantum\_h} and \texttt{quantum\_u}.
+The alias \texttt{quantum}, which points at \texttt{quantum\_h}, is not counted twice.
+The classical count is the total minus the quantum count.
+For a full-quantum model that classical count is the encoder and readout, as in Section~\ref{sec:families}.
+
+\section{Training}
+
+\subsection{Adam}
+
+The default schedule is a constant learning rate.
+An exponential decay is built only when a decay rate strictly less than 1 is supplied.
+The dam-break path leaves the rate constant because a decaying rate was found to stall the soft loss.
+Gradients of \(L\) are taken with respect to every trainable variable and applied with Keras Adam.
+
+Epoch logging prints one aligned table: epoch, total, mass, momentum, IC, and BC.
+The header is printed once.
+A row is printed at epoch 1 and whenever the epoch is a multiple of the interval.
+Trials use \texttt{show\_trial\_epoch\_output} and \texttt{trial\_epoch\_output\_every}, and those lines go to the worker log when stdout is redirected.
+The final Adam run uses \texttt{show\_epoch\_output} and \texttt{epoch\_output\_every}, and \texttt{run\_12cores.sh} does not redirect that process.
+
+\subsection{L-BFGS-B}
+
+If \texttt{use\_lbfgs} is true, SciPy's L-BFGS-B minimizes the same \(L\) on a fixed grid of \texttt{final\_lbfgs\_n\_f} points.
+Variables are packed into one NumPy vector.
+The Jacobian is the TensorFlow gradient, with missing gradients replaced by zeros.
+The SciPy options are \texttt{final\_lbfgs\_max\_iters}, \texttt{final\_lbfgs\_ftol}, \texttt{final\_lbfgs\_gtol}, and \texttt{final\_lbfgs\_maxfun}, with a line-search limit of 50.
+If \texttt{use\_lbfgs} is false, this stage is skipped and the saved message says so.
+
+\subsection{Final training}
+
+Search workers return before this stage.
+A normal \texttt{run\_pinn.py} invocation, and \texttt{--finalize}, build a new network from the winning hyperparameters and train it from a fresh initialization for \texttt{final\_adam\_epochs} epochs on \texttt{final\_adam\_n\_f} points.
+The search does not restore the winning trial's weights.
+The final run uses that trial's family, width, depth, learning rate, qubit count, layer count, and loss weights, the same problem, and the same constraint mode.
+
+\section{Optuna and parallel workers}
+
+The study minimizes a single scalar.
+Storage is Optuna \texttt{RDBStorage} on \texttt{storage\_url}, with a SQLite busy timeout of 120 seconds, so several processes can share one file.
+The study name is \texttt{study\_name}.
+Opening retries \texttt{DuplicatedStudyError} while parallel processes create the study.
+The sampler is \texttt{TPESampler} with \texttt{multivariate=True} and \texttt{group=True}.
+Grouping is what makes the conditional parameters legal: width and depth exist for the trunk families, and qubit count and layer count exist for the quantum families.
+The first \texttt{optuna\_n\_startup\_trials} completed draws are random.
+Setting that equal to \texttt{n\_trials} keeps the whole search random, so TPE does not stop proposing one family.
+Each trial then draws a family independently, and the finished counts are close rather than forced equal.
+
+\texttt{n\_trials} is a cap on completed trials in the study, enforced by \texttt{MaxTrialsCallback} over the \texttt{COMPLETE} state.
+Twelve workers share that cap.
+They do not each run \texttt{n\_trials} new trials.
+A worker that joins an existing study continues the same trial numbers.
+
+One terminal line is written when a trial finishes, through \texttt{/dev/tty} when that device can be opened, so the line is visible while worker stdout is a log file.
+The parenthetical count is the number of completed trials plus one.
+
+\section{Adding a test case}
+
+The trainer calls \texttt{build\_problem(cfg)} and then only uses the returned \texttt{Problem}.
+A test case is a builder that fills that dataclass.
+The trainer does not contain a branch on the test-case name except the registry that selects the builder.
+
+\subsection{The Problem object}
+
+\texttt{Problem} holds:
+
+\begin{itemize}[leftmargin=1.4em]
+\item \texttt{name}, used in output filenames;
+\item \texttt{domain}, a \texttt{Domain1D} with \(x_{\min}\), \(x_{\max}\), \(t_{\min}\), and \(t_{\max}\);
+\item \texttt{output\_fn(model, x, t, constraints)}, which builds the network input and returns the two fields;
+\item \texttt{residual\_fn(model, x, t, constraints)}, which returns the two residual components whose mean squares are \(L_{m}\) and \(L_{p}\);
+\item \texttt{exact\_solution}, optional, used only for figures and for penalties that compare against an exact field;
+\item \texttt{to\_dimensional}, optional, used to rescale figure axes;
+\item \texttt{soft\_constraint\_loss\_fn}, optional, required when \texttt{constraints} is \texttt{soft}.
+\end{itemize}
+
+The network's \texttt{call} always sees a batch of two columns.
+The builder chooses the column order, any nondimensional scaling, and whether time is replaced by a constant.
+That choice is inside \texttt{output\_fn}.
+The three built-in cases do not all use the same column order.
+A new case should document the order it uses.
+
+\texttt{residual\_fn} must call \texttt{output\_fn}, watch the coordinates it differentiates, and return a pair of tensors with the same shape as the collocation batch.
+Hard and soft branches belong in \texttt{output\_fn}.
+The residual then differentiates whichever field that function returned.
+
+\texttt{soft\_constraint\_loss\_fn(model)} returns a scalar penalty and a dictionary.
+The dictionary may contain \texttt{ic} and \texttt{bc}.
+Those entries are what the epoch table prints.
+Any other keys are kept for diagnostics and are not added to \(L\) again.
+The scalar is \(L_{\mathrm{soft}}\).
+
+\subsection{Steps}
+
+\begin{enumerate}[leftmargin=1.4em]
+\item Add a dataclass of physical constants to \texttt{user\_input.py}, and instantiate it next to the three existing instances.
+\item Add \texttt{swe\_pinn/problems/<name>.py} with a \texttt{build\_<name>\_problem(p)} function that closes over those constants and returns a \texttt{Problem}.
+\item Import the builder and the parameter instance in \texttt{swe\_pinn/problems/\_\_init\_\_.py}, and add a branch in \texttt{build\_problem}.
+\item Set \texttt{problem\_name} to the new string.
+\item Point \texttt{storage\_url} and \texttt{study\_name} at a new database and study.
+  An old study was sampled for a different residual.
+  Its trials are not comparable, and its frozen search space may reject the new run.
+\end{enumerate}
+
+Soft and hard constraints are both optional, but the selected \texttt{constraints} value must match what the builder implements.
+If the new residual has no exact solution, omit \texttt{exact\_solution}.
+The final stage then skips the comparison figures and still writes the loss history and the weights.
+
+\section{Built-in test cases}
+
+Each case below is one use of the procedure in the previous section.
+The residual is the pair \((r_{m}, r_{p})\) that enters Section~\ref{sec:objective}.
+
+\subsection{Tidal test}
+
+The builder is \texttt{build\_tidal\_test\_problem} in \texttt{swe\_pinn/problems/tidal\_test.py}.
+The physical constants are \texttt{TidalTestParameters}: gravity \(g\), undisturbed depth \(H\), linear friction \(r\), basin length \(L\), tidal amplitude \(A\), tidal period \(T_{\mathrm{tide}}\), and nondimensional end time \(\tau_{\max}\).
+
+The network domain is \(x\in[0,1]\) and \(t\in[0,\tau_{\max}]\), where \(x\) is distance over \(L\) and \(t\) is time over \(T_{\mathrm{tide}}\).
+The network input is \((x,\ t/\tau_{\max})\).
+The fields are the nondimensional surface elevation \(\eta\) and velocity \(u\).
+Figures are converted back by \texttt{to\_dimensional}: elevation times \(A\), velocity times \(UL/(HT_{\mathrm{tide}})\), distance to kilometers, and time to hours.
+
+The nondimensional linear system is
+\begin{align}
+\eta_{t}+u_{x}&=0,\\
+u_{t}+\alpha\eta_{x}+\beta u&=0,
+\end{align}
+with \(\alpha=gHT_{\mathrm{tide}}^{2}/L^{2}\) and \(\beta=rT_{\mathrm{tide}}\).
+The exact solution is the closed-form complex wave number for a basin that is forced at one end and closed at the other.
+It is evaluated in real arithmetic inside the builder.
+
+In hard mode the output is the exact field plus \(t\,x\,(1-x)\) times the network, so the initial time and both ends remain exact.
+In soft mode the penalty compares the network with the exact elevation and velocity on random interior points at \(t=0\) and on random times at both ends.
+Those penalty points are redrawn on every loss evaluation.
+The PDE collocation grid is still the fixed lattice.
+Default penalty weights are 20 on each initial-condition field and 10 on each boundary field, with 2048 initial points and 1024 boundary points unless the parameter object overrides them.
+
+\subsection{Dam break}
+
+The builder is \texttt{build\_dam\_break\_problem} in \texttt{swe\_pinn/problems/dam\_break.py}.
+The constants are \texttt{DamBreakParameters}.
+The reference setup is a wet-bed dam break with \(g=9.81\,\mathrm{m\,s^{-2}}\), left depth \(0.5\,\mathrm{m}\), right depth \(0.25\,\mathrm{m}\), still water, \(x\in[0,1]\,\mathrm{m}\), \(t\in[0,0.2]\,\mathrm{s}\), and the dam at \(x=0.5\,\mathrm{m}\).
+
+The network input is \((t,x)\) in those physical units.
+The residual is the one-dimensional shallow-water system in conservation form, without friction and without bathymetry,
+\begin{align}
+h_{t}+(hu)_{x}&=0,\\
+(hu)_{t}+\big(hu^{2}+\tfrac12 g h^{2}\big)_{x}&=0.
+\end{align}
+The exact field used for figures is the Stoker wet-bed solution in the Delestre form implemented in the builder.
+It is not part of the training loss.
+
+The initial depth is a sharp step at \(x_{\mathrm{mid}}\) when \texttt{transition\_width} is 0.
+A positive width replaces the step by a \(\tanh\) transition of that scale in the hard-constraint initial field and in the soft initial data.
+
+In hard mode,
+\begin{equation}
+h=h_{\mathrm{init}}(x)+t_{\ast}x_{\ast}(1-x_{\ast})\,h_{\theta},
+\qquad
+u=u_{0}+t_{\ast}x_{\ast}(1-x_{\ast})\,u_{\theta},
+\end{equation}
+where starred coordinates are scaled to \([0,1]\) and \((h_{\theta},u_{\theta})\) is the network.
+In soft mode the penalty is a fixed set of 11 initial stations plus 10 stations on each end, with target depth taken from the initial step or from the near-end still-water value, and target velocity \(u_{0}\).
+The default multipliers are 50 on the depth data and 50 on the velocity data, matching a reference loss of the form \(L_{m}+L_{p}+50\,\mathrm{MSE}(h)+50\,\mathrm{MSE}(u)\).
+
+\subsection{Transcritical bump}
+
+The builder is \texttt{build\_transcritical\_bump\_problem} in \texttt{swe\_pinn/problems/transcritical\_bump.py}.
+The constants are \texttt{TranscriticalBumpParameters}: \(g\), upstream unit discharge \(q_{\mathrm{in}}\), downstream depth \(h_{\mathrm{down}}\), bump height, parabola coefficient, crest and toe locations, soft-penalty multipliers, and the channel interval.
+The default geometry is the standard frictionless bump, \(x\in[0,25]\,\mathrm{m}\), crest height \(0.2\,\mathrm{m}\) at \(x=10\,\mathrm{m}\), toes at \(8\,\mathrm{m}\) and \(12\,\mathrm{m}\), \(q_{\mathrm{in}}=0.18\,\mathrm{m^{2}\,s^{-1}}\), and \(h_{\mathrm{down}}=0.33\,\mathrm{m}\).
+
+The shared trainer still passes \((x,t)\).
+The builder replaces \(t\) by zero before the network, so the learned field is a function of \(x\) only.
+The network input is \((0,x)\).
+The dummy time interval is stored so the collocation grid and the figure mesh still have a time axis.
+Extra time stations repeat the same steady field.
+
+The residual is the steady balance law with bathymetry and no friction,
+\begin{align}
+(hu)_{x}&=0,\\
+\big(hu^{2}+\tfrac12 g h^{2}\big)_{x}+g h z_{x}&=0.
+\end{align}
+The bed is the parabola between the toes and zero outside them.
+This is the conservation form whose momentum jump condition places a stationary hydraulic jump.
+The nonconservative momentum equation is not used.
+It would ask Bernoulli head to be continuous across the jump, and the exact solution dissipates head there.
+
+The reference solution, used for figures, keeps the discharge equal to \(q_{\mathrm{in}}\), follows specific energy on each smooth branch, and places the jump where the momentum flux \(q^{2}/h+\tfrac12 g h^{2}\) agrees on both sides.
+The builder assumes the upstream branch passes through critical flow at the crest.
+If the downstream depth or the bump height is changed so far that no such jump exists, the builder fails while constructing the exact solution.
+The training residual itself does not use that exact profile.
+
+In soft mode the penalty is \(w_{q}(h(0)u(0)-q_{\mathrm{in}})^{2}+w_{h}(h(L)-h_{\mathrm{down}})^{2}\), with both weights defaulting to 50.
+There is no initial-condition term.
+In hard mode the downstream depth is built in exactly, and the velocity is then built so that the upstream discharge equals \(q_{\mathrm{in}}\).
+
+\section{Artifacts}
+
+The final stage writes:
+
+\begin{itemize}[leftmargin=1.4em]
+\item \texttt{best\_optuna\_model.weights.h5} and \texttt{best\_optuna\_model\_config.json};
+\item \texttt{best\_hyperparameters.txt}, including family, learning rate, loss weights, parameter counts, the Optuna trial number when a study exists, and the L-BFGS-B status;
+\item \texttt{data/<problem>\_losses\_data.npz} and \texttt{figures/<problem>\_losses\_2col.png};
+\item when an exact solution exists, elevation, velocity, and error comparisons, a boundary profile, the matching \texttt{.npz} archives, and one \(2\times 2\) model-versus-analytic figure \texttt{figures/<problem>\_model\_vs\_analytic.png}.
+\end{itemize}
+
+Search trials do not write those comparison figures.
+They write user attributes on the Optuna trial.
+
+\texttt{analyze\_param\_tradeoff.py} reads a SQLite study and prints the lowest residuals, the best, quartiles, and worst residual inside each family, and the Pareto front of parameter count against \texttt{raw\_objective}.
+An optional \texttt{--target} lists trials at or below a residual threshold and, when both exist, the smallest classical and hybrid models under that threshold.
+The argument \texttt{--study} is accepted and is not used as a filter.
+The script reads every trial table in the database file.
+\texttt{analysis/make\_optuna\_tidal\_figures\_peer\_reviewed.py} writes PDF summaries of a named study.
+Those tools report the stored residual.
+They do not recompute an analytic field error.
+
+\end{document}

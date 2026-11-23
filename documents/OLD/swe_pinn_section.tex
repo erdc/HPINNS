@@ -1,0 +1,204 @@
+% One methods section for a journal manuscript.
+% Paste from \section through the end of the section, or compile this file alone.
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{microtype}
+
+\begin{document}
+
+\section{Software}
+\label{sec:software}
+
+The calculations reported here are performed with a physics-informed neural
+network for the one-dimensional shallow-water equations. A single trainer
+builds a two-field network for water depth and velocity, minimizes a
+strong-form residual, and, when a search is requested, selects the
+architecture with Optuna. The differential equation, the initial and
+boundary data, and any exact reference solution are supplied by a test-case
+object. The trainer does not contain a separate discretization for each
+benchmark. All trainable tensors and automatic derivatives are stored in
+64-bit precision. The implementation uses TensorFlow and Keras for the
+network, the optimizer, and the spatial and temporal derivatives; NumPy for
+collocation coordinates and archived fields; Optuna for the hyperparameter
+study; and SciPy for optional L-BFGS-B refinement.
+
+\subsection{Network families}
+\label{sec:families}
+
+The network returns the pair of fields supplied to the test case, one
+tower for each field. Hidden layers are
+dense maps with a hyperbolic-tangent activation and Glorot normal
+initialization. Output units are linear. Three families share this
+interface.
+
+In the classical family, each tower is a multilayer perceptron with \(d\)
+hidden layers of width \(w\). For one tower with a two-dimensional input
+and \(d\ge 1\), the number of trainable parameters is
+\begin{equation}
+\label{eq:classical-count}
+3w + (d-1)(w^{2}+w) + (w+1).
+\end{equation}
+The model count is twice~\eqref{eq:classical-count}. No circuit is
+constructed.
+
+In the hybrid family, those perceptrons are retained and a quantum filter
+is added on each tower after the last hidden layer,
+\begin{equation}
+\label{eq:hybrid}
+z \leftarrow z + \alpha\,
+\operatorname{decode}\!\big(\operatorname{circuit}(\operatorname{encode}(z))\big).
+\end{equation}
+The encoder is a hyperbolic-tangent map from the trunk width onto one
+feature per qubit. The decoder maps the measured expectations back to the
+trunk width. The gate \(\alpha\) is a trainable scalar, initialized at
+zero, so the hybrid model begins as its classical trunk. Each tower has
+its own encoder, circuit, decoder, and gate. A hybrid specification with
+zero qubits is stored and trained as a classical model.
+
+In the full-quantum family there is no hidden perceptron and no residual
+gate. Each field is
+\begin{equation}
+\label{eq:fullq}
+\operatorname{readout}\!\big(\operatorname{circuit}(\operatorname{encode}(x,t))\big).
+\end{equation}
+The encoder is one hyperbolic-tangent map from the two coordinates onto
+the qubit features, and the readout is a linear map from the expectations
+to a scalar. Width and depth are not used. The encoder and readout are
+the parameters counted as classical for this family. With \(n_{q}\) qubits
+on each of the two towers, that count is \(8n_{q}+2\).
+
+Both quantum families use the same circuit. A layer applies a three-angle
+rotation on every qubit and then a ring of controlled-NOT gates, including
+the gate from the last qubit back to the first. The feature vector enters
+through an angle embedding of \(Y\) rotations, and the circuit returns the
+Pauli-\(Z\) expectation of every qubit. The number of rotation angles on
+one tower is \(3n_{q}n_{L}\), so the two towers contribute
+\(6n_{q}n_{L}\) quantum parameters. The statevector is evaluated with
+PennyLane's \texttt{default.qubit} device, batched and differentiated
+through a JAX just-in-time compilation. TensorFlow retains the rotation
+angles and the residual tape. A custom gradient inserts the JAX
+vector-Jacobian product into that tape. The compiled circuit is built
+again whenever the qubit count or the layer count changes.
+
+A hybrid run may disable the circuit for an initial fraction of the Adam
+iterations. During that warmup the forward evaluation is the classical
+trunk, while the quantum variables remain in the optimizer and receive
+zero gradients. The full-quantum family has no trunk on which to perform
+that warmup, so the fraction is ignored there.
+
+\subsection{Residual loss}
+\label{sec:loss}
+
+The loss is the sum of the strong-form residual of the governing equations
+and the initial and boundary data. At the collocation stations the test
+case returns the two residual components \(r_{m}\) and \(r_{p}\). With
+logarithmic weights \(\lambda_{m}\) and \(\lambda_{p}\), the normalized
+coefficients of those components are
+\begin{equation}
+(w_{m},w_{p})
+=
+\frac{\big(e^{\lambda_{m}},e^{\lambda_{p}}\big)}
+{\operatorname{mean}\big(e^{\lambda_{m}},e^{\lambda_{p}}\big)},
+\end{equation}
+so equal logarithms produce unit weights. Each residual contribution is a
+mean square. Derivatives of the network outputs are obtained by
+reverse-mode automatic differentiation.
+
+The term \(L_{\mathrm{soft}}\) is the initial and boundary data. It is the
+weighted sum
+\begin{equation}
+\label{eq:lsoft}
+L_{\mathrm{soft}} = L_{\mathrm{ic}} + L_{\mathrm{bc}},
+\end{equation}
+where \(L_{\mathrm{ic}}\) is the mean-square mismatch between the network
+and the prescribed initial values, and \(L_{\mathrm{bc}}\) is the
+mean-square mismatch with the prescribed boundary values. The coefficients
+on these data belong to the test case. They are independent of \(w_{m}\)
+and \(w_{p}\). The discrete loss is
+\begin{equation}
+\label{eq:loss}
+L = w_{m}\,\operatorname{mean}(r_{m}^{2})
+  + w_{p}\,\operatorname{mean}(r_{p}^{2})
+  + L_{\mathrm{soft}}.
+\end{equation}
+In the soft-constraint mode the network output is free, and
+\eqref{eq:lsoft} enforces the initial and boundary data. In the
+hard-constraint mode those data are built into the network output, so
+they hold identically and \(L_{\mathrm{soft}}=0\). Adam and L-BFGS-B
+minimize~\eqref{eq:loss}.
+
+Collocation points form one fixed tensor product on the test-case
+rectangle and are held constant for the whole optimization. Each lattice
+is specified by its number of space stations \(n_{x}\) and its number of
+time stations \(n_{t}\). Both axes include their endpoints, and the
+number of collocation points is the product \(n_{x}n_{t}\). The trial,
+the objective evaluation, the final Adam run, and L-BFGS-B each have
+their own pair \((n_{x},n_{t})\). Adam uses a constant learning rate.
+If L-BFGS-B is enabled, it minimizes the same loss on its lattice, with
+the TensorFlow gradient supplied to SciPy as the Jacobian.
+
+An Optuna trial trains for a prescribed number of Adam epochs on its
+collocation lattice. The value recorded for that trial is~\eqref{eq:loss}
+evaluated once more, without a further parameter update, on the objective
+lattice. That value includes both the governing residual and
+\(L_{\mathrm{soft}}\). Comparison with an exact depth or velocity is
+performed only after the selected model has been trained again, on a
+separate plotting mesh.
+
+The study may minimize \(L\) itself, the product of \(L\) with a factor
+linear in the trainable-parameter count, or a parameter count subject to
+a prescribed ceiling on \(L\). In every mode the parameter count, the
+split between circuit angles and the remaining weights, and the separate
+residual and penalty contributions are stored with the trial.
+
+\subsection{Hyperparameter search}
+
+Optuna minimizes one scalar. The categorical choice of family is made
+first. Width and depth are proposed only for the classical and hybrid
+families. Qubit count and circuit depth are proposed only for the hybrid
+and full-quantum families. Learning rate is drawn log-uniformly. The
+logarithmic loss weights, when they are included in the search, are drawn
+uniformly. Family-specific bounds may be placed on width and depth. Those
+bounds may be set equal, so a hybrid trial and a classical trial search
+the same trunk and differ by the residual circuit~\eqref{eq:hybrid}.
+
+The sampler is the tree-structured Parzen estimator, with grouped
+conditional parameters. A prescribed number of initial trials is drawn
+uniformly. Setting that number equal to the trial budget keeps every draw
+uniform, and each trial then selects a family independently. The budget
+is a cap on completed trials in one SQLite study. Independent processes
+share that study and stop at the same cap. The seed of process \(k\) is
+\(42+k\).
+
+After the search, the winning family, widths, learning rate, circuit
+size, and loss weights are used to initialize a new network. That network
+is trained from the start for the final Adam budget. The weights of the
+winning trial are not reused. The final approximation is the field
+produced by this second training.
+
+\subsection{Test-case interface}
+\label{sec:interface}
+
+A test case is a builder that returns a domain rectangle, an output map,
+a residual map, and, where they exist, an exact solution and a soft
+penalty. The output map receives the raw coordinates and the constraint
+mode, forms the two-column network input, and returns the two fields.
+In the hard mode that map composes the network output so the prescribed
+initial and boundary values hold identically. In the soft mode the
+network output is unconstrained, and the penalty \(L_{\mathrm{soft}}\)
+measures the mismatch with the prescribed data under coefficients
+belonging to the test case. The residual map differentiates the returned
+fields and returns \((r_{m},r_{p})\). The trainer then
+evaluates~\eqref{eq:loss}. An exact solution, when the builder provides
+one, is used for the final comparison on the plotting mesh. It enters
+the loss only if the test case places it inside \(L_{\mathrm{soft}}\).
+
+Adding a test case consists of defining its physical constants,
+implementing this builder, and registering the builder under a new name.
+The search database for that test case is kept separate, because a stored
+study freezes the distributions from which its trials were drawn and
+because its objective belongs to a different residual.
+
+\end{document}

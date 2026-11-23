@@ -1,0 +1,12 @@
+{
+  "width": 4,
+  "depth": 2,
+  "lr": 0.001,
+  "w_mass": 1.0,
+  "w_mom": 1.0,
+  "log_w_mass": 0.0,
+  "log_w_mom": 0.0,
+  "model_family": "hybrid_quantum",
+  "n_qubits": 7,
+  "q_layers": 5
+}

@@ -1,0 +1,40 @@
+Best hyperparameters
+================================================================================
+model_family: hybrid_quantum
+width: 5
+depth: 3
+lr: 0.001
+w_mass: 1
+w_mom: 1
+n_qubits: 4
+q_layers: 7
+embedding: reupload
+
+Trainable parameter counts
+--------------------------------------------------------------------------------
+Total trainable parameters: 428
+Classical trainable parameters: 260
+Quantum trainable parameters: 168
+
+Optuna best trial
+--------------------------------------------------------------------------------
+number: 93
+objective: 4.814400118482073
+val_mass: 0.8152137407340377
+val_mom: 3.999186377748035
+raw_objective: 4.814400118482073
+total_params: 428
+classical_params: 260
+quantum_params: 168
+param_norm: 0.00428
+param_penalty: 0
+param_multiplier: 1
+
+L-BFGS-B
+--------------------------------------------------------------------------------
+used: False
+success: None
+status: None
+message: Skipped by user option (use_lbfgs=False)
+nit: 0
+nfev: 0

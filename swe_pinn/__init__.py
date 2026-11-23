@@ -1,0 +1,1 @@
+"""SWE PINN package."""

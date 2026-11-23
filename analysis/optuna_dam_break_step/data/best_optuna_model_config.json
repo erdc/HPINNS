@@ -1,0 +1,13 @@
+{
+  "width": 5,
+  "depth": 4,
+  "lr": 0.001,
+  "w_mass": 1.0,
+  "w_mom": 1.0,
+  "log_w_mass": 0.0,
+  "log_w_mom": 0.0,
+  "model_family": "hybrid_quantum",
+  "n_qubits": 4,
+  "q_layers": 2,
+  "embedding": "reupload"
+}

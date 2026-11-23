@@ -1,0 +1,9 @@
+\contentsline {figure}{\numberline {1}{\ignorespaces Tide: scoring loss by family. The annotation gives the median.}}{14}{}%
+\contentsline {figure}{\numberline {2}{\ignorespaces Tide: scoring loss against parameter count. Large markers show the Pareto front; hybrid models occupy its low-loss end.}}{15}{}%
+\contentsline {figure}{\numberline {3}{\ignorespaces Retrained tidal hybrid and exact solution. Time is measured in tidal periods. The right column shows pointwise error.}}{16}{}%
+\contentsline {figure}{\numberline {4}{\ignorespaces Dam break: scoring loss by family. The hybrid median is higher than the classical and full-quantum medians.}}{16}{}%
+\contentsline {figure}{\numberline {5}{\ignorespaces Dam break: scoring loss against parameter count. Large markers show the Pareto front. One hybrid trial has lower loss than the best classical trial.}}{17}{}%
+\contentsline {figure}{\numberline {6}{\ignorespaces Retrained dam-break hybrid and the Stoker solution. Time is measured in seconds and \(x\) in meters. Error is concentrated along the smoothed wave fronts.}}{18}{}%
+\contentsline {figure}{\numberline {7}{\ignorespaces Eddy lattice: scoring loss by family. The annotation gives the median. Hybrid trials reach the lowest losses.}}{19}{}%
+\contentsline {figure}{\numberline {8}{\ignorespaces Eddy lattice: scoring loss against parameter count. Large markers show the Pareto front. Full-quantum models occupy most of the low-parameter region, while hybrid models occupy the low-loss region.}}{20}{}%
+\contentsline {figure}{\numberline {9}{\ignorespaces Eddy hybrid and exact solution. The model captures the depth lattice, but the velocity error exceeds the magnitude of the exact velocity.}}{20}{}%

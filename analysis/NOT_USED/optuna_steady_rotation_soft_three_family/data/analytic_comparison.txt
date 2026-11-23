@@ -1,0 +1,19 @@
+Analytic comparison of the best completed trial
+problem: steady_rotation
+trial: 407
+recorded objective: 3.975722e-03
+family: classical
+width: 4
+depth: 7
+n_qubits: 0
+q_layers: 0
+embedding: once
+lr: 1.000000e-03
+parameters: total=411, classical=411, quantum=0
+weights: loaded weights best_optuna_model.weights.h5
+mesh: 201 by 201
+
+field                L2    relative L2           Linf
+h          1.720136e-01   8.272119e-04   2.719664e-03
+u          1.942396e+00   1.665488e-02   1.719351e-02
+v          1.207045e+00   1.034969e-02   1.551665e-02

@@ -1,0 +1,408 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[margin=1in]{geometry}
+
+\title{Three shallow-water tests:\\
+steady rotation, a linear tide, and a dam break}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Steady solid-body rotation}
+\label{sec:rotation}
+
+\subsection{Setup}
+\label{sec:rotation-setup}
+
+The test is a steady, frictionless flow on a flat bed. The coordinates are horizontal, \((x,y)\in[-1,1]^{2}\), and there is no time axis. With gravity \(g=9.81\) and rotation rate \(\omega=1\), the exact fields are the solid-body rotation
+\begin{equation}
+\label{eq:rot-exact}
+u=-\omega y,
+\qquad
+v=\omega x,
+\qquad
+h=h_{c}+\frac{\omega^{2}(x^{2}+y^{2})}{2g},
+\end{equation}
+with the center depth \(h_{c}=1\). The depth is \(1\) at the origin, \(1+1/(2g)\) at the middle of each side, and \(1+1/g\) at each corner. The speed is \(|\omega|\) times the distance from the origin, so \(|u|\) and \(|v|\) are at most \(1\) on this square.
+
+These fields are an exact solution of the steady shallow-water balance on a flat frictionless bed, written in conservation form without a Coriolis term,
+\begin{align}
+\label{eq:swe}
+(hu)_{x}+(hv)_{y}&=0,\\
+\big(hu^{2}+\tfrac12 g h^{2}\big)_{x}+(huv)_{y}&=0,\\
+(huv)_{x}+\big(hv^{2}+\tfrac12 g h^{2}\big)_{y}&=0.
+\end{align}
+The velocity \((u,v)=(-\omega y,\omega x)\) is divergence-free, and \(h\) in~\eqref{eq:rot-exact} depends only on \(x^{2}+y^{2}\), so the mass flux has zero divergence. In the radial direction the same pair is cyclostrophic balance: the centrifugal acceleration \(\omega^{2} r\) is equal to \(g\,\partial h/\partial r\). Integrating that balance from the origin produces the parabola in~\eqref{eq:rot-exact}.
+
+The polynomial structure, a velocity linear in the coordinates and a depth quadratic in the coordinates, is the setting of the exact shallow-water motions in Ball~\cite{ball1963}. That paper treats a shallow liquid on a paraboloid of revolution and includes a level bed as the special case of a flat surface. The solution used here is the steady, non-divergent rotation on that level bed. It is not the time-dependent oscillation in a parabolic basin constructed by Thacker~\cite{thacker1981}.
+
+The network has one tower for each of \(h\), \(u\), and \(v\). Three families share the same loss, the same learning rate, and the same collocation lattices.
+
+\begin{itemize}
+\item Classical. Each tower is a multilayer perceptron with \(\tanh\) hidden units. A trial draws the common width from \(\{8,12,\ldots,48\}\) and the common depth from \(\{2,3,\ldots,8\}\).
+\item Hybrid. The same perceptron is retained, and a quantum circuit is added as a residual correction on each tower. The correction is multiplied by a scalar that starts at zero, so the trial can begin as a classical network. Qubits and variational layers are drawn from \(\{1,2,\ldots,7\}\).
+\item Full quantum. There is no hidden perceptron. Each tower is a linear readout of a circuit applied to an encoding of \((x,y)\). Width and depth are not used. Qubits and variational layers use the same range as the hybrid family.
+\end{itemize}
+
+The circuit, used by both quantum families, is an angle embedding followed by alternating rotation and ring-CNOT layers, evaluated with a statevector simulator. The number of quantum parameters on one tower is \(3\,n_{q}\,n_{L}\). Three towers multiply that count by three.
+
+Training minimizes the mean-square residual of~\eqref{eq:swe} plus a soft penalty that ties \(h\), \(u\), and \(v\) to~\eqref{eq:rot-exact} on the boundary of the square. Each side is sampled with \(32\) uniformly spaced stations. The penalty on each field is weighted by \(50\). There is no initial condition. The two interior residuals are weighted equally: both logarithmic weights are zero, which normalizes to PDE weights \((1,1)\). The boundary weights are separate from those PDE weights.
+
+Every trial uses the same Adam step, \(10^{-3}\), with no decay of that scalar. Adam still rescales each weight from its gradient moments. A trial trains for \(4000\) epochs on a fixed \(20\times 20\) tensor-product lattice, \(400\) points, including the endpoints of both axes. The Optuna objective is the same loss on a \(40\times 40\) lattice, \(1600\) points. That objective is the recorded residual, including the boundary penalty. It is not the analytic solution error.
+
+The search contains \(509\) completed trials. The sampler draws the family uniformly, and the finished counts are \(178\) classical, \(172\) hybrid, and \(159\) full quantum. Width, depth, qubits, and variational layers are drawn inside the ranges above. The learning rate and the PDE weights are not sampled.
+
+After the search, the winning hyperparameters are trained again from a fresh initialization for \(8000\) Adam epochs on a \(64\times 64\) lattice. L-BFGS-B is not used. The comparison with~\eqref{eq:rot-exact} is made on a \(201\times 201\) mesh.
+
+\subsection{Results}
+\label{sec:rotation-results}
+
+Table~\ref{tab:rot-spread} summarizes the recorded objective by family. The best classical trial and the best hybrid trial finish close to one another. The best full-quantum trial does not.
+
+\begin{table}[ht]
+\centering
+\caption{Steady rotation. Recorded objective on the \(40\times 40\) score lattice. The objective is the strong-form loss plus the boundary penalty.}
+\label{tab:rot-spread}
+\begin{tabular}{lrrrrr}
+\toprule
+Family & Trials & Best & Median & Upper quartile & Worst \\
+\midrule
+Classical      & 178 & \(2.60\times 10^{-4}\) & \(2.88\times 10^{-3}\) & \(4.48\times 10^{-3}\) & \(0.360\) \\
+Hybrid quantum & 172 & \(2.88\times 10^{-4}\) & \(2.31\times 10^{-3}\) & \(4.01\times 10^{-3}\) & \(0.342\) \\
+Full quantum   & 159 & \(2.89\times 10^{-2}\) & \(0.782\)            & \(0.951\)            & \(1.36\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The best completed trial is classical, number \(393\), with width \(40\), depth \(6\), and \(25083\) trainable parameters. Its recorded objective is \(2.60\times 10^{-4}\). Of that value, the boundary penalty is \(1.43\times 10^{-4}\), the momentum residual is \(9.87\times 10^{-5}\), and the mass residual is \(1.84\times 10^{-5}\). The best hybrid trial, number \(137\), has width \(24\), depth \(5\), \(5\) qubits and \(4\) variational layers, \(8481\) parameters, and objective \(2.88\times 10^{-4}\). The best full-quantum trial, number \(64\), has \(3\) qubits, \(5\) variational layers, \(174\) parameters, and objective \(2.89\times 10^{-2}\).
+
+The hybrid network therefore reaches a residual about \(11\%\) higher than the best classical network with about one third of the parameters (\(8481\) against \(25083\)). Through the middle of the search the hybrid family is the stronger of the two trunk families: its median objective, \(2.31\times 10^{-3}\), is below the classical median, \(2.88\times 10^{-3}\). Figure~\ref{fig:rot-families} shows the two trunk families occupying the same band, with the full-quantum trials higher by one to two orders of magnitude.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/steady_rotation/figures/optuna_model_family_comparison.pdf}
+\caption{Steady rotation. Distribution of the recorded objective by family. Full-quantum trials lie above the two families that keep a classical trunk.}
+\label{fig:rot-families}
+\end{figure}
+
+The Pareto front of parameter count against the recorded objective makes the same split (Figure~\ref{fig:rot-pareto}). At the smallest budgets only full-quantum models appear, and their objectives stay above \(10^{-1}\) until the circuit reaches \(174\) parameters, where the best full-quantum loss is still \(2.89\times 10^{-2}\). A classical network with \(315\) parameters already matches that neighborhood (\(2.51\times 10^{-2}\)), and a classical network with \(963\) parameters reaches \(1.00\times 10^{-3}\). From a few thousand parameters upward the front is hybrid, until the largest classical network, trial \(393\), takes the lowest loss. Hybrid is the parameter-efficient choice near the accuracy that this budget can actually reach. It does not improve on the single best loss.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.78\textwidth]{../analysis/steady_rotation/figures/optuna_pareto_front.pdf}
+\caption{Steady rotation. Recorded objective against trainable-parameter count. The connected markers are the Pareto front.}
+\label{fig:rot-pareto}
+\end{figure}
+
+Within each family, the fANOVA importances in Figure~\ref{fig:rot-importance} attribute the recorded loss to the hyperparameters that vary inside that family. For classical networks the classical width carries relative importance \(0.68\) and the classical depth \(0.32\). For hybrid networks the classical width carries \(0.47\) and the variational layers \(0.36\), while the qubits carry \(0.11\) and the classical depth \(0.06\). For full-quantum networks the qubits carry \(0.87\) and the variational layers \(0.13\). Adding a circuit to a trunk changes the loss mainly through the classical width and the variational layers. Removing the trunk leaves a model whose loss is controlled by the qubits and remains well above the trunk families.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/steady_rotation/figures/optuna_parameter_importance.pdf}
+\caption{Steady rotation. Relative importance of the hyperparameters that vary within each family. Each panel is normalized separately.}
+\label{fig:rot-importance}
+\end{figure}
+
+The weights of trial \(393\) were retrained for \(8000\) Adam epochs on the \(64\times 64\) lattice and compared with~\eqref{eq:rot-exact} on the \(201\times 201\) mesh (Figure~\ref{fig:rot-analytic}). The relative \(L_{2}\) errors are \(2.06\times 10^{-3}\) in \(h\), \(3.64\times 10^{-3}\) in \(u\), and \(3.25\times 10^{-3}\) in \(v\). The corresponding maximum absolute errors are \(2.74\times 10^{-3}\), \(5.10\times 10^{-3}\), and \(4.00\times 10^{-3}\). The depth error is a nearly uniform offset of a few millimeters on the unit of \(h_{c}=1\). The velocity errors are smooth and largest toward the boundary. This comparison is for the winning classical model. No quantum trial won the search, so the analytic figure is not a quantum-network result.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.92\textwidth]{../analysis/steady_rotation/figures/model_vs_analytic.pdf}
+\caption{Steady rotation. Final classical model, trial \(393\), against the exact fields~\eqref{eq:rot-exact} on the \(201\times 201\) mesh. The right column is the pointwise error.}
+\label{fig:rot-analytic}
+\end{figure}
+
+On this smooth exact solution, under a shared learning rate and a shared epoch budget, the quantum circuit is an advantage only as a residual on a classical trunk, and only as a reduction in parameter count at nearly the best residual. The pure quantum family, with the circuit sizes and the \(4000\)-epoch budget used here, does not reach the residual of a small classical network.
+
+\section{Linear tidal oscillation}
+\label{sec:tidal}
+
+\subsection{Setup}
+\label{sec:tidal-setup}
+
+The second test is a linear tide in a flat basin of length \(L=10^{5}\,\mathrm{m}\) and undisturbed depth \(H=10\,\mathrm{m}\). Gravity is \(g=9.81\,\mathrm{m\,s^{-2}}\), the linear friction coefficient is \(r=10^{-4}\,\mathrm{s^{-1}}\), the tidal amplitude at the forced end is \(A=0.01\,\mathrm{m}\), and the tidal period is \(T_{\mathrm{tide}}=12.42\,\mathrm{h}\). The network coordinates are the nondimensional distance \(x\in[0,1]\), equal to distance over \(L\), and the nondimensional time \(\tau\in[0,3]\), equal to time over \(T_{\mathrm{tide}}\). The run therefore covers three tidal periods. The collocation rectangle is three times longer in \(\tau\) than in \(x\). The network input is \((x,\tau/3)\), so the perceptron and the circuit see a unit square.
+
+The fields are the nondimensional surface elevation \(\eta\) and velocity \(u\). Dimensionally they are \(A\eta\) and \(U u\), with the velocity scale \(U=AL/(HT_{\mathrm{tide}})\). They satisfy the linear long-wave balance with a drag linear in velocity,
+\begin{equation}
+\label{eq:tide-pde}
+\eta_{\tau}+u_{x}=0,
+\qquad
+u_{\tau}+\alpha\eta_{x}+\beta u=0,
+\end{equation}
+where \(\alpha=gHT_{\mathrm{tide}}^{2}/L^{2}\) and \(\beta=rT_{\mathrm{tide}}\). The forced end is \(x=0\) and the closed end is \(x=1\). The exact solution is the damped co-oscillating tide obtained from~\eqref{eq:tide-pde} by a complex wave number,
+\begin{equation}
+\label{eq:tide-exact}
+\kappa=\sqrt{\frac{(2\pi)^{2}-i\,2\pi\beta}{\alpha}},
+\qquad
+\hat\eta(x)=\frac{\cos[\kappa(1-x)]}{\cos\kappa},
+\qquad
+\hat u(x)=-\frac{\alpha\kappa}{i\,2\pi+\beta}\,\frac{\sin[\kappa(1-x)]}{\cos\kappa}.
+\end{equation}
+The fields used in training are the imaginary parts of \(\hat\eta(x)\,e^{i 2\pi\tau}\) and \(\hat u(x)\,e^{i 2\pi\tau}\). At \(x=1\) the velocity vanishes. At \(x=0\) the nondimensional elevation has unit amplitude. This is the standing long wave of linear shallow-water theory, with the friction entering only through the complex \(\kappa\). The frictionless closed-basin wave is the case \(\beta=0\) in Dean and Dalrymple~\cite{dean1991}. The linear drag used here is the standard extension of that wave.
+
+The constraints are hard. The network output is the exact field plus the factor \(\tau\,x\,(1-x)\) times a free correction, in the unscaled coordinates \((x,\tau)\). The correction therefore vanishes at \(\tau=0\) and at both ends \(x=0\) and \(x=1\), and the initial and boundary values are exact. The loss is only the mean-square residual of~\eqref{eq:tide-pde}. Both residuals are weighted equally, which again follows from logarithmic PDE weights of zero. There is no boundary penalty in the objective.
+
+The families, the width and depth sets, and the qubit and variational-layer sets are the same as in Section~\ref{sec:rotation-setup}. The tide has two towers, one for \(\eta\) and one for \(u\), so a full-quantum model has \(6\,n_{q}\,n_{L}\) quantum parameters rather than the three-tower count of the rotation test. The Adam step is fixed at \(5\times 10^{-4}\) for every trial and for the final training. A trial trains for \(1000\) epochs on a \(19\times 55\) lattice, \(1045\) points, with the same spacing on the two axes of the \(1\times 3\) rectangle. The recorded objective is that residual on a \(38\times 110\) lattice, \(4180\) points.
+
+The search again contains \(509\) completed trials, drawn uniformly in family: \(177\) classical, \(173\) hybrid, and \(159\) full quantum. The winning hyperparameters are trained again from a fresh initialization for \(2000\) Adam epochs on the same \(38\times 110\) lattice. L-BFGS-B is not used. The comparison with~\eqref{eq:tide-exact} uses a \(201\times 201\) mesh.
+
+\subsection{Results}
+\label{sec:tidal-results}
+
+Table~\ref{tab:tide-spread} gives the recorded objective by family. The best trial is now hybrid, and the full-quantum trials remain far above the two families that keep a classical trunk.
+
+\begin{table}[ht]
+\centering
+\caption{Linear tide. Recorded objective on the \(38\times 110\) score lattice. Hard constraints make this objective the strong-form residual alone.}
+\label{tab:tide-spread}
+\begin{tabular}{lrrrrr}
+\toprule
+Family & Trials & Best & Median & Upper quartile & Worst \\
+\midrule
+Classical      & 177 & \(4.77\times 10^{-6}\) & \(2.69\times 10^{-4}\) & \(1.46\times 10^{-3}\) & \(0.208\) \\
+Hybrid quantum & 173 & \(2.20\times 10^{-6}\) & \(4.83\times 10^{-4}\) & \(1.77\times 10^{-3}\) & \(0.338\) \\
+Full quantum   & 159 & \(3.41\times 10^{-3}\) & \(0.350\)            & \(1.96\)            & \(32.1\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The best completed trial is hybrid, number \(18\), with classical width \(48\), classical depth \(8\), \(4\) qubits, \(3\) variational layers, and \(34260\) parameters, of which \(72\) are quantum. Its recorded objective is \(2.20\times 10^{-6}\), split into a mass residual of \(2.12\times 10^{-7}\) and a momentum residual of \(1.99\times 10^{-6}\). The initial and boundary penalties are zero because the hard constraint already enforces them. The best classical trial, number \(128\), has width \(48\), depth \(7\), \(28610\) parameters, and objective \(4.77\times 10^{-6}\). The best full-quantum trial, number \(433\), has \(2\) qubits, \(3\) variational layers, \(54\) parameters, and objective \(3.41\times 10^{-3}\).
+
+The winning hybrid residual is about \(2.2\) times smaller than the best classical residual. The two models are the same size of trunk: the hybrid network has \(34260\) parameters against \(28610\), and only \(72\) of those parameters sit in the circuit. The advantage is a lower residual at the top of the search, not a reduction in parameter count. Through the body of the search the classical family is the more consistent of the two. Its median, \(2.69\times 10^{-4}\), lies below the hybrid median, \(4.83\times 10^{-4}\). Figure~\ref{fig:tide-families} shows that overlap, and it shows the full-quantum trials, including a long tail of failed runs, sitting well above both.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/tidal_test/figures/optuna_model_family_comparison.pdf}
+\caption{Linear tide. Distribution of the recorded objective by family.}
+\label{fig:tide-families}
+\end{figure}
+
+On the Pareto front (Figure~\ref{fig:tide-pareto}) the small models are classical or full quantum. A classical network with \(642\) parameters reaches \(4.41\times 10^{-4}\), already about eight times smaller than the best full-quantum objective. Hybrid models join the front at \(868\) parameters and hold several later points, including the lowest objective, trial \(18\). A classical network with \(3938\) parameters reaches \(1.42\times 10^{-5}\). The hybrid trial that next improves on that value uses \(7864\) parameters to reach \(9.44\times 10^{-6}\). The circuit therefore earns the last reduction in residual by sitting on the largest classical trunks. It does not replace those trunks.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.78\textwidth]{../analysis/tidal_test/figures/optuna_pareto_front.pdf}
+\caption{Linear tide. Recorded objective against trainable-parameter count. The connected markers are the Pareto front.}
+\label{fig:tide-pareto}
+\end{figure}
+
+Figure~\ref{fig:tide-importance} assigns the recorded loss within each family. Classical width carries relative importance \(0.76\) and classical depth \(0.24\). In the hybrid family the classical width carries \(0.48\) and the classical depth \(0.41\), while qubits carry \(0.087\) and variational layers \(0.027\). In the full-quantum family the variational layers carry \(0.55\) and the qubits \(0.45\). The loss of a hybrid trial is controlled by the classical trunk. The circuit hyperparameters move that loss by a much smaller share, which is consistent with a \(72\)-parameter correction on a \(34000\)-parameter network.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/tidal_test/figures/optuna_parameter_importance.pdf}
+\caption{Linear tide. Relative importance of the hyperparameters that vary within each family. Each panel is normalized separately.}
+\label{fig:tide-importance}
+\end{figure}
+
+Trial \(18\) was retrained for \(2000\) Adam epochs on the \(38\times 110\) lattice and compared with~\eqref{eq:tide-exact} on the \(201\times 201\) mesh (Figure~\ref{fig:tide-analytic}). The relative \(L_{2}\) errors are \(1.19\times 10^{-5}\) in the elevation and \(2.22\times 10^{-5}\) in the velocity. The maximum absolute errors are \(4.97\times 10^{-5}\) and \(3.19\times 10^{-4}\). Because the hard constraint builds the exact initial and end values into the output, these errors are the interior correction. The elevation error is a small smooth residual on the unit nondimensional tide. The velocity error is larger in absolute nondimensional units and remains below \(4\times 10^{-4}\).
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.92\textwidth]{../analysis/tidal_test/figures/model_vs_analytic.pdf}
+\caption{Linear tide. Final hybrid model, trial \(18\), against the exact fields~\eqref{eq:tide-exact} on the \(201\times 201\) mesh. The right column is the pointwise error.}
+\label{fig:tide-analytic}
+\end{figure}
+
+On this linear exact solution the hybrid circuit is an advantage at the best residual, by about a factor of two over the best classical network of similar size. It is not an advantage in the median trial, and it is not a route to a smaller model. The full-quantum family, at the circuit sizes and the \(1000\)-epoch budget used here, remains about three orders of magnitude above the best hybrid residual.
+
+\section{Wet-bed dam break}
+\label{sec:dambreak}
+
+\subsection{Setup}
+\label{sec:dambreak-setup}
+
+The third test is the wet-bed dam break on a flat frictionless channel. The channel runs from \(x=0\) to \(x=1\,\mathrm{m}\), and the solution is followed from \(t=0\) to \(t=0.2\,\mathrm{s}\). Gravity is \(g=9.81\,\mathrm{m\,s^{-2}}\). The dam stands at \(x_{0}=0.5\,\mathrm{m}\). The water is initially at rest, with depth \(h_{L}=0.5\,\mathrm{m}\) on the left of the dam and depth \(h_{R}=0.25\,\mathrm{m}\) on the right:
+\begin{equation}
+\label{eq:db-ic}
+h(x,0)=
+\begin{cases}
+h_{L}, & x\le x_{0},\\
+h_{R}, & x>x_{0},
+\end{cases}
+\qquad
+u(x,0)=0.
+\end{equation}
+The network input is \((t/0.2,\,x)\), so the perceptron and the circuit see the unit square. The residuals are still differentiated in the physical coordinates \((x,t)\).
+
+The fields satisfy the one-dimensional shallow-water equations in conservation form,
+\begin{equation}
+\label{eq:db-pde}
+h_{t}+(hu)_{x}=0,
+\qquad
+(hu)_{t}+\big(hu^{2}+\tfrac12 g h^{2}\big)_{x}=0.
+\end{equation}
+The exact solution is the wet-bed Riemann problem of Stoker~\cite{stoker1957}. The explicit formulae used here are those compiled by Delestre et al.~\cite{delestre2013}. Let \(c_{L}=\sqrt{g h_{L}}\) and let the intermediate depth \(h_{m}\) be the root of the shock--rarefaction match
+\begin{equation}
+\label{eq:db-hm}
+2\big(c_{L}-\sqrt{g h_{m}}\big)
+=
+(h_{m}-h_{R})
+\sqrt{\frac{g}{2}\,\frac{h_{m}+h_{R}}{h_{m} h_{R}}}.
+\end{equation}
+The intermediate velocity is \(u_{m}=2(c_{L}-\sqrt{g h_{m}})\), and the shock speed follows from the mass jump, \(S=h_{m} u_{m}/(h_{m}-h_{R})\). For the depths above, \(h_{m}=0.363\,\mathrm{m}\) and \(u_{m}=0.653\,\mathrm{m\,s^{-1}}\). The rarefaction head moves at \(-c_{L}=-2.21\,\mathrm{m\,s^{-1}}\), the rarefaction tail at \(-1.24\,\mathrm{m\,s^{-1}}\), and the shock at \(S=+2.09\,\mathrm{m\,s^{-1}}\). The three fronts are
+\begin{equation}
+\label{eq:db-fronts}
+x_{A}=x_{0}-t\,c_{L},
+\qquad
+x_{B}=x_{0}+t\,(2c_{L}-3\sqrt{g h_{m}}),
+\qquad
+x_{C}=x_{0}+t\,S.
+\end{equation}
+At a fixed \(t>0\) the solution is the left state, a centered rarefaction, a constant intermediate state, and the right state,
+\begin{equation}
+\label{eq:db-exact}
+h(x,t)=
+\begin{cases}
+h_{L}, & x<x_{A},\\[2pt]
+\dfrac{4}{9g}\Big(c_{L}-\dfrac{x-x_{0}}{2t}\Big)^{2}, & x_{A}\le x\le x_{B},\\[8pt]
+h_{m}, & x_{B}<x\le x_{C},\\[2pt]
+h_{R}, & x>x_{C},
+\end{cases}
+\qquad
+u(x,t)=
+\begin{cases}
+0, & x<x_{A},\\[2pt]
+\dfrac{2}{3}\Big(\dfrac{x-x_{0}}{t}+c_{L}\Big), & x_{A}\le x\le x_{B},\\[8pt]
+u_{m}, & x_{B}<x\le x_{C},\\[2pt]
+0, & x>x_{C}.
+\end{cases}
+\end{equation}
+At \(t=0.2\,\mathrm{s}\) the head is at \(x_{A}=0.057\,\mathrm{m}\), the tail at \(x_{B}=0.253\,\mathrm{m}\), and the shock at \(x_{C}=0.918\,\mathrm{m}\). Both walls are still in their initial states, so the boundary values over the whole window are \((h,u)=(h_{L},0)\) at \(x=0\) and \((h_{R},0)\) at \(x=1\).
+
+The constraints are soft. The network output is used directly in~\eqref{eq:db-pde} and in the data penalty. The loss is the mean-square residual of~\eqref{eq:db-pde} plus separate penalties on the initial step and on the two walls,
+\begin{equation}
+\label{eq:db-loss}
+\begin{aligned}
+L={}&
+\overline{r_{m}^{2}}+\overline{r_{p}^{2}}
++50\,\mathrm{MSE}(h_{\mathrm{ic}})+50\,\mathrm{MSE}(u_{\mathrm{ic}})\\
+&+10\,\mathrm{MSE}(h_{\mathrm{bc}})+10\,\mathrm{MSE}(u_{\mathrm{bc}}).
+\end{aligned}
+\end{equation}
+The two PDE residuals are weighted equally: both logarithmic weights are zero, which normalizes to PDE weights \((1,1)\). Those weights do not scale the data terms. The initial penalty uses \(41\) samples at \(t=0\), placed by \(x=x_{0}\pm\tfrac12|s|^{1.3}\) with \(s\) spaced uniformly from \(-1\) to \(1\). An odd count puts one sample on the dam. The spacing runs from \(1.0\,\mathrm{cm}\) at the dam to \(3.2\,\mathrm{cm}\) at the walls, and seven of the \(41\) samples lie in \([0.45,0.55]\). The targets there are~\eqref{eq:db-ic}. Each wall uses \(10\) times spaced uniformly from \(0\) to \(0.2\,\mathrm{s}\), with the constant targets above. The wall weight is \(10\) and the initial weight is \(50\), so the flat boundary does not dilute the step.
+
+The families and the qubit and variational-layer sets are the same as in Section~\ref{sec:rotation-setup}. Depth is drawn from \(\{2,3,\ldots,8\}\). Width is drawn from \(\{8,12,\ldots,48\}\) in \(815\) of the classical and hybrid trials and from \(\{1,2,\ldots,7\}\) in the other \(143\). This test has two towers, one for \(h\) and one for \(u\), so a circuit contributes \(6\,n_{q}\,n_{L}\) quantum parameters. The Adam step is fixed at \(5\times 10^{-4}\) for every trial and for the final training, with no decay of that scalar. A trial trains for \(5000\) epochs on a fixed \(61\times 31\) tensor-product lattice, \(1891\) points, including the endpoints of both axes. The spacing is \(1.67\,\mathrm{cm}\) in \(x\) and \(6.67\times 10^{-3}\,\mathrm{s}\) in \(t\). Over one time step the shock moves \(1.4\,\mathrm{cm}\), about one cell. The recorded objective is the loss~\eqref{eq:db-loss} on a \(101\times 41\) lattice, \(4141\) points. That objective includes the data penalty. It is not the analytic solution error.
+
+The search contains \(1209\) completed trials: \(673\) classical, \(285\) hybrid, and \(251\) full quantum. The first \(100\) are drawn uniformly. The later trials use the TPE sampler. The learning rate and the PDE weights are not sampled.
+
+After the search, the winning hyperparameters are trained again from a fresh initialization for \(30000\) Adam epochs on the same \(101\times 41\) lattice used to score the trials. L-BFGS-B is not used. The comparison with~\eqref{eq:db-exact} is made on a \(201\times 201\) mesh.
+
+\subsection{Results}
+\label{sec:dambreak-results}
+
+Table~\ref{tab:db-spread} summarizes the recorded objective by family. The best classical trials sit just above \(6\times 10^{-2}\). The added narrow networks stretch the classical upper tail to about \(1\). The hybrid trials reach the classical floor only at their lower edge. The full-quantum trials sit near \(0.7\).
+
+\begin{table}[ht]
+\centering
+\caption{Wet-bed dam break. Recorded objective on the \(101\times 41\) score lattice. The objective is the strong-form loss~\eqref{eq:db-loss}, including the initial and wall penalties.}
+\label{tab:db-spread}
+\begin{tabular}{lrrrrr}
+\toprule
+Family & Trials & Best & Median & Upper quartile & Worst \\
+\midrule
+Classical      & 673 & \(5.85\times 10^{-2}\) & \(7.02\times 10^{-2}\) & \(9.99\times 10^{-2}\) & \(0.936\) \\
+Hybrid quantum & 285 & \(6.55\times 10^{-2}\) & \(0.298\)            & \(0.487\)            & \(5.86\) \\
+Full quantum   & 251 & \(0.603\)            & \(0.728\)            & \(0.789\)            & \(2.65\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The best completed trial is classical, number \(401\), with width \(40\), depth \(8\), and \(23282\) trainable parameters. Its recorded objective is \(5.85\times 10^{-2}\). Of that value, the initial penalty is \(3.98\times 10^{-2}\), the mass residual is \(1.14\times 10^{-2}\), the momentum residual is \(7.06\times 10^{-3}\), and the wall penalty is \(3.23\times 10^{-4}\). The best hybrid trial, number \(56\), has width \(32\), depth \(8\), \(1\) qubit and \(2\) variational layers, \(15250\) parameters of which \(12\) are quantum, and objective \(6.55\times 10^{-2}\). Its initial penalty is \(4.58\times 10^{-2}\) and its mass residual is \(1.30\times 10^{-2}\). The best full-quantum trial, number \(741\), has \(2\) qubits, \(2\) variational layers, and \(42\) parameters, of which \(24\) are circuit angles. Its objective is \(0.603\), and the initial penalty alone is \(0.432\). Two hybrid trials of the \(285\) fall below the classical median. None falls below the classical minimum. Ten hybrid trials finish below \(0.1\), and every one of those ten has a classical width of at least \(24\).
+
+The extra parameters in the hybrid model are the circuit angles, the maps into and out of the circuit, and the scalar that multiplies the correction. That scalar starts at zero, so each hybrid trial begins as its classical trunk. A variational circuit with a standard angle encoding returns a truncated Fourier series in its inputs~\cite{schuld2021}. The correction added to the trunk is therefore a smooth harmonic function of the hidden features. Siegl et al.~\cite{siegl2024} train this kind of circuit on linear advection of a discontinuity: the classical network fits the jump, and the circuit does not. Leong et al.~\cite{leong2025} report the same split on a shock. Their full quantum model oscillates across the discontinuity. Their hybrid model, a classical network beside the circuit, removes most of that oscillation and reaches about the classical fidelity, with the non-harmonic part of the shock carried by the classical network.
+
+That is the pattern in Figure~\ref{fig:db-families}. The classical trunk already occupies the floor of this strong-form loss, and the floor is the initial step: about two thirds of the best classical objective is the initial penalty, while the wall penalty is two orders of magnitude smaller. A smooth circuit correction has no jump to add, so it does not move that floor down. When the scalar and the angles leave zero, the correction usually raises the loss, which is the wide hybrid box. The hybrids that remain near \(7\times 10^{-2}\) are the ones whose correction stayed small. The full-quantum model has no trunk. Every circuit in the search fails the step in the same way, which is why those trials form a cloud near \(0.7\) and why the momentum residual of the best of them, \(9.61\times 10^{-2}\), is an order of magnitude above the classical momentum residual.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/dam_break/figures/optuna_model_family_comparison.pdf}
+\caption{Wet-bed dam break. Distribution of the recorded objective by family. The classical upper tail is the narrow networks. The hybrid lower edge meets the classical floor. The full-quantum trials lie near \(0.7\).}
+\label{fig:db-families}
+\end{figure}
+
+The Pareto front makes the practical comparison direct (Figure~\ref{fig:db-pareto}). Every point on it is classical. A network with \(14\) parameters, width \(1\) and depth \(2\), has objective \(0.630\). Width \(1\) and depth \(5\), \(26\) parameters, reaches \(0.579\), already below the best full-quantum objective of \(0.603\). Width \(5\) and depth \(8\), \(462\) parameters, reaches \(9.23\times 10^{-2}\). Width \(7\) and depth \(8\), \(842\) parameters, reaches \(6.44\times 10^{-2}\), below the best hybrid objective, which uses \(15250\) parameters to reach \(6.55\times 10^{-2}\). A classical network with \(8594\) parameters reaches \(6.13\times 10^{-2}\). The lowest loss is trial \(401\), with \(23282\) parameters. Adding the circuit does not buy a smaller model at a given loss, and it does not buy a lower loss at a given size.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.78\textwidth]{../analysis/dam_break/figures/optuna_pareto_front.pdf}
+\caption{Wet-bed dam break. Recorded objective against trainable-parameter count. The connected markers are the Pareto front. Hybrid trials lie above it.}
+\label{fig:db-pareto}
+\end{figure}
+
+Within each family, the fANOVA importances in Figure~\ref{fig:db-importance} attribute the recorded loss to the hyperparameters that vary inside that family. All \(1209\) completed trials enter the calculation, with width placed on one integer axis from \(1\) to \(48\). For classical networks the width carries relative importance \(0.87\) and the depth \(0.13\). For hybrid networks the classical depth carries \(0.40\) and the qubits \(0.32\), while the classical width carries \(0.15\) and the variational layers \(0.14\). For full-quantum networks the qubits carry \(0.55\) and the variational layers \(0.45\). Across the hybrid family the qubit count now moves the recorded loss by about a third. The single best hybrid trial is still a \(12\)-parameter circuit on a trunk of \(15238\) parameters.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/dam_break/figures/optuna_parameter_importance.pdf}
+\caption{Wet-bed dam break. Relative importance of the hyperparameters that vary within each family. Each panel is normalized separately.}
+\label{fig:db-importance}
+\end{figure}
+
+The weights of trial \(401\) were retrained for \(30000\) Adam epochs on the \(101\times 41\) lattice and compared with~\eqref{eq:db-exact} on the \(201\times 201\) mesh (Figure~\ref{fig:db-analytic}). The relative \(L_{2}\) errors are \(3.31\times 10^{-2}\) in \(h\) and \(0.182\) in \(u\). The maximum absolute errors are \(0.133\,\mathrm{m}\) and \(0.598\,\mathrm{m\,s^{-1}}\). The depth error is concentrated at the rounded shock and through the rarefaction. The velocity error has the same support: the exact plateau is \(0.653\,\mathrm{m\,s^{-1}}\), and the largest miss is most of that value. This comparison is for the winning classical model. No quantum trial won the search.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.92\textwidth]{../analysis/dam_break/figures/model_vs_analytic.pdf}
+\caption{Wet-bed dam break. Final classical model, trial \(401\), against the exact fields~\eqref{eq:db-exact} on the \(201\times 201\) mesh. The right column is the pointwise error.}
+\label{fig:db-analytic}
+\end{figure}
+
+For this kind of problem, a discontinuous shallow-water wave, the practical model is the classical trunk. The hybrid circuit is useful on the smooth tests above, where it can match or slightly improve the best residual. Here the basis it adds is the Fourier family of Schuld et al.~\cite{schuld2021}, and that family does not contain the shock. The result agrees with the discontinuous tests of Siegl et al.~\cite{siegl2024} and with the shock tests of Leong et al.~\cite{leong2025}: a circuit alone misses the jump, and a hybrid falls back to the accuracy of its classical part. In this search that fallback is the lower edge of the hybrid box, about \(12\%\) above the best classical objective, and the typical hybrid trial is several times worse. The additional trials leave both of those objectives where they were. A full-quantum model at the circuit sizes and the \(5000\)-epoch budget used here does not produce a usable dam-break solution: its best objective is \(0.603\). The remaining error in the best classical model is the rounded front itself. Further width, the narrow-width block, or a circuit on top of the trunk does not sharpen it.
+
+\begin{thebibliography}{9}
+
+\bibitem{ball1963}
+F.~K. Ball,
+Some general theorems concerning the finite motion of a shallow rotating liquid lying on a paraboloid,
+\textit{Journal of Fluid Mechanics} \textbf{17} (1963), 240--256.
+doi:10.1017/S0022112063001270.
+
+\bibitem{thacker1981}
+W.~C. Thacker,
+Some exact solutions to the nonlinear shallow-water wave equations,
+\textit{Journal of Fluid Mechanics} \textbf{107} (1981), 499--508.
+doi:10.1017/S0022112081001882.
+
+\bibitem{dean1991}
+R.~G. Dean and R.~A. Dalrymple,
+\textit{Water Wave Mechanics for Engineers and Scientists},
+World Scientific, Singapore, 1991.
+
+\bibitem{stoker1957}
+J.~J. Stoker,
+\textit{Water Waves: The Mathematical Theory with Applications},
+Interscience Publishers, New York, 1957.
+
+\bibitem{delestre2013}
+O.~Delestre, C.~Lucas, P.-A. Ksinant, F.~Darboux, C.~Laguerre,
+T.-N.-T. Vo, F.~James, and S.~Cordier,
+SWASHES: a compilation of shallow water analytic solutions for hydraulic and environmental studies,
+\textit{International Journal for Numerical Methods in Fluids} \textbf{72} (2013), 269--300.
+doi:10.1002/fld.3741.
+
+\bibitem{schuld2021}
+M.~Schuld, R.~Sweke, and J.~J. Meyer,
+Effect of data encoding on the expressive power of variational quantum-machine-learning models,
+\textit{Physical Review A} \textbf{103} (2021), 032430.
+doi:10.1103/PhysRevA.103.032430.
+
+\bibitem{siegl2024}
+P.~Siegl, S.~Wassing, D.~M. Mieth, S.~Langer, and P.~Bekemeyer,
+Solving transport equations on quantum computers---potential and limitations of physics-informed quantum circuits,
+\textit{CEAS Aeronautical Journal} (2024).
+doi:10.1007/s13272-024-00774-2.
+
+\bibitem{leong2025}
+F.~Y. Leong, W.-B. Ewe, S.~B.~Q. Tran, Z.~Zhang, and J.~Y. Khoo,
+Hybrid quantum physics-informed neural network: towards efficient learning of high-speed flows,
+arXiv:2503.02202, 2025.
+
+\end{thebibliography}
+
+\end{document}

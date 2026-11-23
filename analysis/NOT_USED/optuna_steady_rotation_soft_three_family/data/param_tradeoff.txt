@@ -1,0 +1,43 @@
+Parameter tradeoff
+The recorded objective is the strong-form loss on the score lattice, including the soft penalty.
+It is not the analytic solution error. That comparison is in analytic_comparison.txt when an exact solution exists.
+
+Best trials by recorded objective
+number   model_family embedding width depth n_qubits q_layers classical_params quantum_params total_params raw_objective optuna_objective
+   407      classical               4     7        0        0              411              0          411  3.975722e-03     3.975722e-03
+    46      classical               5     5        0        0              423              0          423  4.877258e-03     4.877258e-03
+    60 hybrid_quantum  reupload     3     4        2        8              198            144          342  5.229561e-03     5.229561e-03
+    96 hybrid_quantum  reupload     5     2        2        6              234            108          342  5.233199e-03     5.233199e-03
+   195      classical               5     5        0        0              423              0          423  5.309991e-03     5.309991e-03
+   231      classical               5     4        0        0              333              0          333  5.408246e-03     5.408246e-03
+   640 hybrid_quantum  reupload     3     4        6        2              282            108          390  5.792924e-03     5.792924e-03
+   399      classical               4     6        0        0              351              0          351  5.799390e-03     5.799390e-03
+   529      classical               4     7        0        0              411              0          411  5.831322e-03     5.831322e-03
+   484 hybrid_quantum  reupload     4     3        4        4              291            144          435  5.912798e-03     5.912798e-03
+   550   full_quantum  reupload     0     0        5        7               63            315          378  6.165014e-03     6.165014e-03
+   606      classical               4     5        0        0              291              0          291  6.397562e-03     6.397562e-03
+   448 hybrid_quantum  reupload     3     4        2        1              198             18          216  6.542126e-03     6.542126e-03
+    17      classical               4     7        0        0              411              0          411  6.634467e-03     6.634467e-03
+   278      classical               3     5        0        0              183              0          183  6.799887e-03     6.799887e-03
+
+Recorded-objective spread by model family
+           model_family   n         best          p25       median          p75        worst
+              classical 212 3.975722e-03 2.339511e-02 4.049069e-01 6.551892e-01 3.418680e+01
+hybrid_quantum_reupload 127 5.229561e-03 3.130821e-02 4.461565e-01 6.849818e-01 1.049063e+00
+  full_quantum_reupload 175 6.165014e-03 3.226619e-02 4.263316e-01 4.958887e-01 1.277311e+00
+
+Pareto front: fewer parameters and a lower recorded objective
+number   model_family embedding width depth n_qubits q_layers classical_params quantum_params total_params raw_objective optuna_objective
+   679      classical               1     4        0        0               33              0           33  8.254917e-01     8.254917e-01
+   196   full_quantum  reupload     0     0        1        3               15             27           42  5.355986e-01     5.355986e-01
+   244      classical               2     2        0        0               45              0           45  4.571680e-01     4.571680e-01
+   518   full_quantum  reupload     0     0        1        6               15             54           69  4.438770e-01     4.438770e-01
+   389      classical               3     2        0        0               75              0           75  4.766038e-02     4.766038e-02
+    55      classical               4     2        0        0              111              0          111  2.311981e-02     2.311981e-02
+   313      classical               3     4        0        0              147              0          147  1.102471e-02     1.102471e-02
+   278      classical               3     5        0        0              183              0          183  6.799887e-03     6.799887e-03
+   448 hybrid_quantum  reupload     3     4        2        1              198             18          216  6.542126e-03     6.542126e-03
+   606      classical               4     5        0        0              291              0          291  6.397562e-03     6.397562e-03
+   231      classical               5     4        0        0              333              0          333  5.408246e-03     5.408246e-03
+    60 hybrid_quantum  reupload     3     4        2        8              198            144          342  5.229561e-03     5.229561e-03
+   407      classical               4     7        0        0              411              0          411  3.975722e-03     3.975722e-03

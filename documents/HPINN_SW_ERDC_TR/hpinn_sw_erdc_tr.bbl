@@ -1,0 +1,207 @@
+\begin{thebibliography}{24}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Abadi et~al.(2015)Abadi, Agarwal, Barham, Brevdo, Chen, Citro,
+  Corrado, Davis, Dean, Devin, Ghemawat, Goodfellow, Harp, Irving, Isard, Jia,
+  Jozefowicz, Kaiser, Kudlur, Levenberg, Man{\'e}, Monga, Moore, Murray, Olah,
+  Schuster, Shlens, Steiner, Sutskever, Talwar, Tucker, Vanhoucke, Vasudevan,
+  Vi{\'e}gas, Vinyals, Warden, Wattenberg, Wicke, Yu, and
+  Zheng]{tensorflow2015}
+Mart{\'i}n Abadi, Ashish Agarwal, Paul Barham, Eugene Brevdo, Zhifeng Chen,
+  Craig Citro, Greg~S. Corrado, Andy Davis, Jeffrey Dean, Matthieu Devin,
+  Sanjay Ghemawat, Ian Goodfellow, Andrew Harp, Geoffrey Irving, Michael Isard,
+  Yangqing Jia, Rafal Jozefowicz, Lukasz Kaiser, Manjunath Kudlur, Josh
+  Levenberg, Dan Man{\'e}, Rajat Monga, Sherry Moore, Derek Murray, Chris Olah,
+  Mike Schuster, Jonathon Shlens, Benoit Steiner, Ilya Sutskever, Kunal Talwar,
+  Paul Tucker, Vincent Vanhoucke, Vijay Vasudevan, Fernanda Vi{\'e}gas, Oriol
+  Vinyals, Pete Warden, Martin Wattenberg, Martin Wicke, Yuan Yu, and Xiaoqiang
+  Zheng.
+\newblock {TensorFlow}: Large-scale machine learning on heterogeneous systems.
+\newblock Software, 2015.
+\newblock TensorFlow.
+
+\bibitem[Akiba et~al.(2019)Akiba, Sano, Yanase, Ohta, and
+  Koyama]{akiba2019optuna}
+Takuya Akiba, Shotaro Sano, Toshihiko Yanase, Takeru Ohta, and Masanori Koyama.
+\newblock Optuna: A next-generation hyperparameter optimization framework.
+\newblock In \emph{Proceedings of the 25th {ACM} {SIGKDD} International
+  Conference on Knowledge Discovery \& Data Mining}, pages 2623--2631.
+  Association for Computing Machinery, 2019.
+\newblock \doi{10.1145/3292500.3330701}.
+
+\bibitem[Berger et~al.(2025)Berger, Hosters, and
+  M{\"o}ller]{berger2025trainable}
+Stefan Berger, Norbert Hosters, and Matthias M{\"o}ller.
+\newblock Trainable embedding quantum physics informed neural networks for
+  solving nonlinear {PDE}s.
+\newblock \emph{Scientific Reports}, 15:\penalty0 18823, 2025.
+\newblock \doi{10.1038/s41598-025-02959-z}.
+
+\bibitem[Bergholm et~al.(2018)Bergholm, Izaac, Schuld, Gogolin, Alam, Ahmed,
+  Arrazola, Blank, Delgado, Jahangiri, McKiernan, Meyer, Niu, Sz{\'a}va, and
+  Killoran]{bergholm2018pennylane}
+Ville Bergholm, Josh Izaac, Maria Schuld, Christian Gogolin, M.~Sohaib Alam,
+  Shahnawaz Ahmed, Juan~Miguel Arrazola, Carsten Blank, Alain Delgado, Soran
+  Jahangiri, Keri McKiernan, Johannes~Jakob Meyer, Zeyue Niu, Antal Sz{\'a}va,
+  and Nathan Killoran.
+\newblock {PennyLane}: Automatic differentiation of hybrid quantum-classical
+  computations.
+\newblock \emph{arXiv preprint arXiv:1811.04968}, 2018.
+\newblock \doi{10.48550/arXiv.1811.04968}.
+
+\bibitem[Dean and Dalrymple(1991)]{Dean1991}
+Robert~G. Dean and Robert~A. Dalrymple.
+\newblock \emph{Water Wave Mechanics for Engineers and Scientists}.
+\newblock World Scientific, Singapore, 1991.
+
+\bibitem[Dees et~al.(2024)Dees, Jacquier, and Laizet]{dees2024unsupervised}
+Josh Dees, Antoine Jacquier, and Sylvain Laizet.
+\newblock Unsupervised random quantum networks for {PDE}s.
+\newblock \emph{Quantum Information Processing}, 23:\penalty0 325, 2024.
+\newblock \doi{10.1007/s11128-024-04537-0}.
+
+\bibitem[Delestre et~al.(2013)Delestre, Lucas, Ksinant, Darboux, Laguerre, Vo,
+  James, and Cordier]{Delestre2013}
+Olivier Delestre, Carine Lucas, Pierre-Antoine Ksinant, Frederic Darboux,
+  Christian Laguerre, Thi Ngoc~Tuoi Vo, Francois James, and Stephane Cordier.
+\newblock {SWASHES}: A compilation of shallow water analytic solutions for
+  hydraulic and environmental studies.
+\newblock \emph{International Journal for Numerical Methods in Fluids},
+  72:\penalty0 269--300, 2013.
+\newblock doi:10.1002/fld.3741.
+
+\bibitem[Kyriienko et~al.(2021)Kyriienko, Paine, and Elfving]{Kyriienko2021}
+Oleksandr Kyriienko, Annie~E. Paine, and Vincent~E. Elfving.
+\newblock Solving nonlinear differential equations with differentiable quantum
+  circuits.
+\newblock \emph{Physical Review A}, 103:\penalty0 052416, 2021.
+\newblock doi:10.1103/PhysRevA.103.052416.
+
+\bibitem[Leong et~al.(2025)Leong, Ewe, Tran, Zhang, and
+  Khoo]{leong2025highspeed}
+Fong~Yew Leong, Wei-Bin Ewe, Si~Bui~Quang Tran, Zhongyuan Zhang, and Jun~Yong
+  Khoo.
+\newblock Hybrid quantum physics-informed neural network: Towards efficient
+  learning of high-speed flows.
+\newblock \emph{Computers \& Fluids}, 301:\penalty0 106782, 2025.
+\newblock \doi{10.1016/j.compfluid.2025.106782}.
+
+\bibitem[Li et~al.(2026)Li, Yang, Wang, and Zhang]{li2026adaptive}
+Le~Li, Junkai Yang, Qingle Wang, and Zhichao Zhang.
+\newblock Quantum physics-informed neural network with residual-based adaptive
+  refinement for solving partial differential equations.
+\newblock \emph{Physical Review Research}, 8:\penalty0 033042, 2026.
+\newblock \doi{10.1103/lb19-wv6f}.
+
+\bibitem[Markazi and Mirza(2025)]{markazi2025evaluating}
+Navid Markazi and Behrouz Mirza.
+\newblock Evaluating the performance of classical, quantum, and hybrid quantum
+  neural networks in solving differential equations.
+\newblock \emph{Scientific Reports}, 15:\penalty0 39332, 2025.
+\newblock \doi{10.1038/s41598-025-22950-y}.
+
+\bibitem[Markidis(2022)]{markidis2022physics}
+Stefano Markidis.
+\newblock On physics-informed neural networks for quantum computers.
+\newblock \emph{Frontiers in Applied Mathematics and Statistics}, 8:\penalty0
+  1036711, 2022.
+\newblock \doi{10.3389/fams.2022.1036711}.
+
+\bibitem[Panichi et~al.(2026)Panichi, Corli, and
+  Prati]{panichi2026multivariable}
+Giorgio Panichi, Sebastiano Corli, and Enrico Prati.
+\newblock Quantum physics-informed neural networks for multivariable partial
+  differential equations.
+\newblock \emph{Physical Review Applied}, 25:\penalty0 014001, 2026.
+\newblock \doi{10.1103/6nh4-yh2y}.
+
+\bibitem[P{\'e}rez-Salinas et~al.(2020)P{\'e}rez-Salinas, Cervera-Lierta,
+  Gil-Fuster, and Latorre]{PerezSalinas2020}
+Adri{\'a}n P{\'e}rez-Salinas, Alba Cervera-Lierta, Elies Gil-Fuster, and
+  Jos{\'e}~I. Latorre.
+\newblock Data re-uploading for a universal quantum classifier.
+\newblock \emph{Quantum}, 4:\penalty0 226, 2020.
+\newblock doi:10.22331/q-2020-02-06-226.
+
+\bibitem[Raissi et~al.(2019)Raissi, Perdikaris, and Karniadakis]{Raissi2019}
+Maziar Raissi, Paris Perdikaris, and George~Em Karniadakis.
+\newblock Physics-informed neural networks: {A} deep learning framework for
+  solving forward and inverse problems involving nonlinear partial differential
+  equations.
+\newblock \emph{Journal of Computational Physics}, 378:\penalty0 686--707,
+  2019.
+\newblock doi:10.1016/j.jcp.2018.10.045.
+
+\bibitem[Schuld et~al.(2021)Schuld, Sweke, and Meyer]{Schuld2021}
+Maria Schuld, Ryan Sweke, and Johannes~Jakob Meyer.
+\newblock Effect of data encoding on the expressive power of variational
+  quantum-machine-learning models.
+\newblock \emph{Physical Review A}, 103:\penalty0 032430, 2021.
+\newblock doi:10.1103/PhysRevA.103.032430.
+
+\bibitem[Sedykh et~al.(2024)Sedykh, Podapaka, Sagingalieva, Pinto, Pflitsch,
+  and Melnikov]{Sedykh2024}
+Alexandr Sedykh, Maninadh Podapaka, Asel Sagingalieva, Karan Pinto, Markus
+  Pflitsch, and Alexey Melnikov.
+\newblock Hybrid quantum physics-informed neural networks for simulating
+  computational fluid dynamics in complex shapes.
+\newblock \emph{Machine Learning: Science and Technology}, 5:\penalty0 025045,
+  2024.
+\newblock doi:10.1088/2632-2153/ad43b2.
+
+\bibitem[Setty et~al.(2025)Setty, Abdusalamov, and
+  Motzoi]{setty2025selfadaptive}
+Abhishek Setty, Rasul Abdusalamov, and Felix Motzoi.
+\newblock Self-adaptive physics-informed quantum machine learning for solving
+  differential equations.
+\newblock \emph{Machine Learning: Science and Technology}, 6:\penalty0 015002,
+  2025.
+\newblock \doi{10.1088/2632-2153/ada3ab}.
+
+\bibitem[Siegl et~al.(2024)Siegl, Wassing, Mieth, Langer, and
+  Bekemeyer]{siegl2024transport}
+Pia Siegl, Simon Wassing, Dirk~Markus Mieth, Stefan Langer, and Philipp
+  Bekemeyer.
+\newblock Solving transport equations on quantum computers---potential and
+  limitations of physics-informed quantum circuits.
+\newblock \emph{CEAS Aeronautical Journal}, 2024.
+\newblock \doi{10.1007/s13272-024-00774-2}.
+
+\bibitem[Sim et~al.(2019)Sim, Johnson, and Aspuru-Guzik]{Sim2019}
+Sukin Sim, Peter~D. Johnson, and Al{\'a}n Aspuru-Guzik.
+\newblock Expressibility and entangling capability of parameterized quantum
+  circuits for hybrid quantum-classical algorithms.
+\newblock \emph{Advanced Quantum Technologies}, 2\penalty0 (12):\penalty0
+  1900070, 2019.
+\newblock \doi{10.1002/qute.201900070}.
+
+\bibitem[Stoker(1957)]{Stoker1957}
+J.~J. Stoker.
+\newblock \emph{Water Waves: {T}he Mathematical Theory with Applications}.
+\newblock Wiley, New York, 1957.
+
+\bibitem[Trahan et~al.(2024)Trahan, Loveland, and Dent]{Trahan2024}
+Corey Trahan, Mark Loveland, and Samuel Dent.
+\newblock Quantum physics-informed neural networks.
+\newblock \emph{Entropy}, 26:\penalty0 649, 2024.
+\newblock doi:10.3390/e26080649.
+
+\bibitem[Vadyala and Betgeri(2023)]{vadyala2023general}
+Shashank~Reddy Vadyala and Sai~Nethra Betgeri.
+\newblock General implementation of quantum physics-informed neural networks.
+\newblock \emph{Array}, 18:\penalty0 100287, 2023.
+\newblock \doi{10.1016/j.array.2023.100287}.
+
+\bibitem[Xiao et~al.(2024)Xiao, Yang, Shu, Chew, Khoo, Cui, and
+  Liu]{xiao2024physics}
+Y.~Xiao, L.~M. Yang, C.~Shu, S.~C. Chew, B.~C. Khoo, Y.~D. Cui, and Y.~Y. Liu.
+\newblock Physics-informed quantum neural network for solving forward and
+  inverse problems of partial differential equations.
+\newblock \emph{Physics of Fluids}, 36\penalty0 (9):\penalty0 097145, 2024.
+\newblock \doi{10.1063/5.0226232}.
+
+\end{thebibliography}

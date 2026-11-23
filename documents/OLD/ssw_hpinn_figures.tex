@@ -1,0 +1,29 @@
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{../analysis/steady_rotation/figures/optuna_objective_history.pdf}
+\caption{Recorded objective of each completed trial. The step line is the best value attained so far.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{../analysis/steady_rotation/figures/optuna_pareto_front.pdf}
+\caption{Recorded objective against trainable-parameter count. Larger markers lie on the Pareto front.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{../analysis/steady_rotation/figures/optuna_model_family_comparison.pdf}
+\caption{Distribution of the recorded objective by model family.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.72\textwidth]{../analysis/steady_rotation/figures/optuna_parameter_importance.pdf}
+\caption{Relative importance of the hyperparameters that vary within each model family. Each panel is normalized separately.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.92\textwidth]{../analysis/steady_rotation/figures/model_vs_analytic.pdf}
+\caption{Best completed trial compared with the analytic solution. Each row is one field. The right column is the pointwise error.}
+\end{figure}

@@ -1,0 +1,37 @@
+Best hyperparameters
+================================================================================
+model_family: classical
+width: 4
+depth: 7
+lr: 0.001
+w_mass: 1
+w_mom: 1
+
+Trainable parameter counts
+--------------------------------------------------------------------------------
+Total trainable parameters: 411
+Classical trainable parameters: 411
+Quantum trainable parameters: 0
+
+Optuna best trial
+--------------------------------------------------------------------------------
+number: 407
+objective: 0.003975722431903593
+val_mass: 0.0002312967124910838
+val_mom: 0.002811483518044241
+raw_objective: 0.003975722431903593
+total_params: 411
+classical_params: 411
+quantum_params: 0
+param_norm: 0.00411
+param_penalty: 0
+param_multiplier: 1
+
+L-BFGS-B
+--------------------------------------------------------------------------------
+used: False
+success: None
+status: None
+message: Skipped by user option (use_lbfgs=False)
+nit: 0
+nfev: 0

@@ -1,0 +1,13 @@
+{
+  "width": 4,
+  "depth": 7,
+  "lr": 0.001,
+  "w_mass": 1.0,
+  "w_mom": 1.0,
+  "log_w_mass": 0.0,
+  "log_w_mom": 0.0,
+  "model_family": "classical",
+  "n_qubits": 0,
+  "q_layers": 0,
+  "embedding": "once"
+}

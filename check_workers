@@ -1,0 +1,1 @@
+ps aux | grep -E 'run_pinn.py|run_12cores.sh' | grep -v grep

@@ -1,0 +1,48 @@
+Parameter tradeoff
+The recorded objective is the strong-form loss on the score lattice, including the soft penalty.
+It is not the analytic solution error. That comparison is in analytic_comparison.txt when an exact solution exists.
+
+Best trials by recorded objective
+number   model_family width depth n_qubits q_layers classical_params quantum_params total_params raw_objective optuna_objective
+   876 hybrid_quantum     4     2        7        5              208            210          418  7.851099e+00     7.851099e+00
+   578 hybrid_quantum     5     2        6        3              244            108          352  8.136265e+00     8.136265e+00
+   248 hybrid_quantum     5     3        6        4              304            144          448  8.884207e+00     8.884207e+00
+   139      classical     5     7        0        0              402              0          402  1.080499e+01     1.080499e+01
+   776 hybrid_quantum     4     6        7        1              368             42          410  1.208428e+01     1.208428e+01
+   562 hybrid_quantum     5     4        2        8              276             96          372  1.212607e+01     1.212607e+01
+   294 hybrid_quantum     5     4        3        1              298             18          316  1.218190e+01     1.218190e+01
+   521 hybrid_quantum     5     3        4        5              260            120          380  1.234271e+01     1.234271e+01
+   575      classical     5     7        0        0              402              0          402  1.287765e+01     1.287765e+01
+   116      classical     5     6        0        0              342              0          342  1.321136e+01     1.321136e+01
+   708 hybrid_quantum     4     3        7        4              248            168          416  1.409820e+01     1.409820e+01
+   999      classical     5     6        0        0              342              0          342  1.431443e+01     1.431443e+01
+   945      classical     5     6        0        0              342              0          342  1.434491e+01     1.434491e+01
+   943      classical     5     6        0        0              342              0          342  1.480639e+01     1.480639e+01
+   660      classical     5     7        0        0              402              0          402  1.596851e+01     1.596851e+01
+
+Recorded-objective spread by model family
+  model_family   n         best          p25       median          p75        worst
+     classical 331 1.080499e+01 1.435683e+02 2.175184e+02 2.679165e+02 3.581385e+02
+hybrid_quantum 307 7.851099e+00 9.286740e+01 1.739283e+02 2.495941e+02 3.576873e+02
+  full_quantum 376 2.203591e+02 2.591997e+02 2.717941e+02 2.837167e+02 3.655067e+02
+
+Pareto front: fewer parameters and a lower recorded objective
+number   model_family width depth n_qubits q_layers classical_params quantum_params total_params raw_objective optuna_objective
+   649   full_quantum     0     0        1        3               10             18           28  2.857015e+02     2.857015e+02
+   288      classical     1     6        0        0               30              0           30  2.517622e+02     2.517622e+02
+  1060 hybrid_quantum     1     7        1        1               42              6           48  2.346619e+02     2.346619e+02
+   443      classical     2     4        0        0               54              0           54  1.956246e+02     1.956246e+02
+  1122      classical     3     3        0        0               74              0           74  1.654105e+02     1.654105e+02
+   831      classical     2     6        0        0               78              0           78  1.467777e+02     1.467777e+02
+   941      classical     3     4        0        0               98              0           98  1.353724e+02     1.353724e+02
+   937      classical     3     5        0        0              122              0          122  1.154585e+02     1.154585e+02
+   457 hybrid_quantum     3     3        1        5               94             30          124  1.040779e+02     1.040779e+02
+   855      classical     3     6        0        0              146              0          146  5.272032e+01     5.272032e+01
+    84 hybrid_quantum     3     7        1        2              190             12          202  3.296888e+01     3.296888e+01
+   389      classical     5     4        0        0              222              0          222  3.130642e+01     3.130642e+01
+   364 hybrid_quantum     3     4        5        2              174             60          234  3.037440e+01     3.037440e+01
+   391 hybrid_quantum     4     4        3        2              216             36          252  2.538784e+01     2.538784e+01
+   250      classical     5     5        0        0              282              0          282  2.047711e+01     2.047711e+01
+   294 hybrid_quantum     5     4        3        1              298             18          316  1.218190e+01     1.218190e+01
+   578 hybrid_quantum     5     2        6        3              244            108          352  8.136265e+00     8.136265e+00
+   876 hybrid_quantum     4     2        7        5              208            210          418  7.851099e+00     7.851099e+00

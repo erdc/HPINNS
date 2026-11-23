@@ -1,0 +1,18 @@
+Analytic comparison of the best completed trial
+problem: tidal_test
+trial: 93
+recorded objective: 4.814400e+00
+family: hybrid_quantum
+width: 5
+depth: 3
+n_qubits: 4
+q_layers: 7
+embedding: reupload
+lr: 1.000000e-03
+parameters: total=428, classical=260, quantum=168
+weights: loaded weights best_optuna_model.weights.h5
+mesh: 201 by 201
+
+field                L2    relative L2           Linf
+h          6.338164e+00   2.876046e-02   1.370127e-01
+u          6.329263e+01   7.520335e-02   1.466302e+00

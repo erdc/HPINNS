@@ -1,0 +1,17 @@
+\contentsline {chapter}{Figures and Tables}{iv}{}%
+\contentsline {chapter}{Preface}{v}{}%
+\contentsline {chapter}{\numberline {1}Introduction}{1}{}%
+\contentsline {chapter}{\numberline {2}Shallow-water benchmarks}{4}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {2.0.1}Linear tide}{4}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {2.0.2}Wet-bed dam break}{5}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {2.0.3}Steady eddy lattice}{5}{}%
+\contentsline {chapter}{\numberline {3}Software}{7}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {3.0.1}Network families}{7}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {3.0.2}Residual loss}{9}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {3.0.3}Hyperparameter search}{10}{}%
+\contentsline {chapter}{\numberline {4}Results}{13}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {4.0.1}Linear tide}{13}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {4.0.2}Wet-bed dam break}{15}{}%
+\contentsline {subsection}{\itshape \fontsize {9}{12}\selectfont \numberline {4.0.3}Steady eddy lattice}{17}{}%
+\contentsline {chapter}{\numberline {5}Conclusion}{21}{}%
+\contentsline {chapter}{References\markboth {\MakeUppercase []{References}}{\MakeUppercase []{References}}}{22}{}%
